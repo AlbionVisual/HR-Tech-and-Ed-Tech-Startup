@@ -104,7 +104,7 @@ Dev-сервер — **HTTPS** (self-signed через `@vitejs/plugin-basic-ssl
 
 ```
 cd mvp-front
-npm run build
+npm run build:pages
 ```
 
 ## Скрипты

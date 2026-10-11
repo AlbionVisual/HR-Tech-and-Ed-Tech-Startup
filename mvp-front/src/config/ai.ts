@@ -36,7 +36,7 @@ export const aiConfig = {
     models: ['gemini-3.5-flash-lite', 'deepseek-v4.1-flash'],
     defaultModel: 'gemini-3.5-flash-lite',
   },
-  byok: {п
+  byok: {
     storageKeyPrefix: 'mvp.ai.byokKey',
   },
 }
