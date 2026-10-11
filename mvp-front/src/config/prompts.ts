@@ -12,6 +12,13 @@ export type AssistantMarkers = {
   progress: number | null
 }
 
+// Антон добавил для резюме
+export type ResumeMode =
+  | 'ats_check'
+  | 'improve_experience'
+  | 'keywords'
+  | 'formatting'
+
 const gradeLabel: Record<VacancyGrade, string> = {
   intern: 'стажировка',
   junior: 'junior',
@@ -99,6 +106,31 @@ export function buildInterviewSystemPrompt(input: {
   ].join('\n')
 }
 
+// Антон добавил для резюме все вопросы к нему
+export function buildResumeSystemPrompt(input: { mode: ResumeMode }) {
+  const modeInstructions: Record<ResumeMode, string> = {
+    ats_check:
+      'Проведи анализ резюме на соответствие системам ATS (Applicant Tracking System). Найди слабые места, нечитаемые структуры или синтаксис.',
+    improve_experience:
+      'Проанализируй блок опыта. Предложи более сильные формулировки с акцентом на достижения, действие и конкретные метрики/результаты.',
+    keywords:
+      'Оцени наличие ключевых слов и профессиональных навыков. Укажи, каких важных терминов и стека технологий не хватает.',
+    formatting:
+      'Оцени структуру, визуальное форматирование и читаемость резюме. Дай рекомендации по улучшению подачи.',
+  }
+
+  return [
+    'Ты — эксперт по составлению резюме и IT-рекрутер.',
+    'Твоя задача — проанализировать предоставленный текст резюме.',
+    `Фокус анализа: ${modeInstructions[input.mode]}`,
+    '',
+    'Правила ответа:',
+    '1. Отвечай на русском языке, структурированно, с помощью маркеров и списков.',
+    '2. Давай конкретные и применимые советы, а также примеры исправленных формулировок.',
+    '3. Будь вежливым, профессиональным и конструктивным.',
+  ].join('\n')
+}
+
 export const promptsConfig = {
   firstUserKickoff:
     'Начни интервью: коротко представься как интервьюер и задай первый вопрос. Без отзыва и без метки [[FEEDBACK]]. В конце добавь [[PROGRESS:5]].',
@@ -106,4 +138,5 @@ export const promptsConfig = {
   progressMarker,
   parseAssistantMarkers,
   buildInterviewSystemPrompt,
+  buildResumeSystemPrompt,
 }
