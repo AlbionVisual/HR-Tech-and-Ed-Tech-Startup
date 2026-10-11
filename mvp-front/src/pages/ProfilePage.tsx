@@ -22,13 +22,25 @@ const fields: KeyField[] = [
     label: 'OpenRouter API key',
     placeholder: 'sk-or-...',
   },
+  {
+    provider: 'aiai',
+    label: 'AIAI.BY API key',
+    placeholder: 'sk-...',
+  },
 ]
 
+type KeysState = Record<AiProviderId, string>
+
+function readKeys(): KeysState {
+  return {
+    gemini: getByokKey('gemini'),
+    openrouter: getByokKey('openrouter'),
+    aiai: getByokKey('aiai'),
+  }
+}
+
 export function ProfilePage() {
-  const [geminiKey, setGeminiKey] = useState(() => getByokKey('gemini'))
-  const [openrouterKey, setOpenrouterKey] = useState(() =>
-    getByokKey('openrouter'),
-  )
+  const [keys, setKeys] = useState<KeysState>(() => readKeys())
   const [saved, setSaved] = useState<AiProviderId | null>(null)
   const [demoLink, setDemoLink] = useState('')
   const [copied, setCopied] = useState(false)
@@ -47,31 +59,29 @@ export function ProfilePage() {
           ? `${selected.provider} / ${selected.model}`
           : 'ничего',
       )
-      setGeminiKey(getByokKey('gemini'))
-      setOpenrouterKey(getByokKey('openrouter'))
+      setKeys(readKeys())
     }
     window.addEventListener(AI_SETTINGS_EVENT, sync)
     return () => window.removeEventListener(AI_SETTINGS_EVENT, sync)
   }, [])
 
   function save(provider: AiProviderId) {
-    const value = provider === 'gemini' ? geminiKey : openrouterKey
-    setByokKey(value, provider)
+    setByokKey(keys[provider], provider)
     setSaved(provider)
   }
 
   function clear(provider: AiProviderId) {
     clearByokKey(provider)
-    if (provider === 'gemini') setGeminiKey('')
-    else setOpenrouterKey('')
+    setKeys((prev) => ({ ...prev, [provider]: '' }))
     setSaved(null)
   }
 
   function makeLink() {
     const selected = resolveSelection()
     const link = buildSetupLink({
-      gemini: geminiKey.trim() || undefined,
-      openrouter: openrouterKey.trim() || undefined,
+      gemini: keys.gemini.trim() || undefined,
+      openrouter: keys.openrouter.trim() || undefined,
+      aiai: keys.aiai.trim() || undefined,
       model: selected.option?.model,
       provider: selected.option?.provider,
       useHash: true,
@@ -90,61 +100,59 @@ export function ProfilePage() {
     <div className="grid max-w-xl gap-3 p-4">
       <h2 className="m-0 text-[1.05rem]">API-ключи (BYOK)</h2>
       <p className="m-0 text-[0.92rem] text-muted">
-        Можно сохранить оба ключа. В шапке появятся модели тех провайдеров, для
-        которых есть ключ. Сейчас выбрано: <strong>{selectedLabel}</strong>
+        Можно сохранить ключи всех провайдеров. В шапке появятся модели тех, для
+        кого есть ключ. AIAI.BY — платный бэкап. Сейчас выбрано:{' '}
+        <strong>{selectedLabel}</strong>
       </p>
 
-      {fields.map((field) => {
-        const value = field.provider === 'gemini' ? geminiKey : openrouterKey
-        const setValue =
-          field.provider === 'gemini' ? setGeminiKey : setOpenrouterKey
-        return (
-          <section
-            key={field.provider}
-            className="grid gap-2 border-b border-line pb-3"
-          >
-            <label className="grid gap-1.5">
-              <span className={fieldLabel}>{field.label}</span>
-              <input
-                className={fieldInput}
-                type="password"
-                placeholder={field.placeholder}
-                value={value}
-                onChange={(e) => {
-                  setValue(e.target.value)
-                  setSaved(null)
-                }}
-              />
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={btnPrimary}
-                onClick={() => save(field.provider)}
-              >
-                Сохранить
-              </button>
-              <button
-                type="button"
-                className={btn}
-                onClick={() => clear(field.provider)}
-              >
-                Удалить
-              </button>
-            </div>
-            {saved === field.provider ? (
-              <p className="m-0 text-[0.92rem] text-ok">Сохранено</p>
-            ) : null}
-          </section>
-        )
-      })}
+      {fields.map((field) => (
+        <section
+          key={field.provider}
+          className="grid gap-2 border-b border-line pb-3"
+        >
+          <label className="grid gap-1.5">
+            <span className={fieldLabel}>{field.label}</span>
+            <input
+              className={fieldInput}
+              type="password"
+              placeholder={field.placeholder}
+              value={keys[field.provider]}
+              onChange={(e) => {
+                setKeys((prev) => ({
+                  ...prev,
+                  [field.provider]: e.target.value,
+                }))
+                setSaved(null)
+              }}
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={btnPrimary}
+              onClick={() => save(field.provider)}
+            >
+              Сохранить
+            </button>
+            <button
+              type="button"
+              className={btn}
+              onClick={() => clear(field.provider)}
+            >
+              Удалить
+            </button>
+          </div>
+          {saved === field.provider ? (
+            <p className="m-0 text-[0.92rem] text-ok">Сохранено</p>
+          ) : null}
+        </section>
+      ))}
 
       <section className="grid gap-2 border-t border-line pt-3">
         <h3 className="m-0 text-base">Демо-ссылка с ключами</h3>
         <p className="m-0 text-[0.92rem] text-muted">
           Для жюри: откроют ссылку — ключи сами попадут в localStorage, из
-          адресной строки уберутся. Свои BYOK-ключи других людей это не
-          затирает, только если в ссылке переданы те же провайдеры.
+          адресной строки уберутся.
         </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={btnPrimary} onClick={makeLink}>
@@ -199,9 +207,27 @@ export function ProfilePage() {
             </a>
           </li>
           <li>Create API Key → вставьте сюда</li>
+        </ol>
+        <h3 className="m-0 text-base">AIAI.BY</h3>
+        <ol className="m-0 list-decimal pl-[18px] text-muted">
           <li>
-            Список моделей: <code>src/config/ai.ts</code> →{' '}
-            <code>openrouter.models</code>
+            Откройте{' '}
+            <a
+              className="text-ink"
+              href="https://aiai.by"
+              target="_blank"
+              rel="noreferrer"
+            >
+              aiai.by
+            </a>{' '}
+            → кабинет → API-ключ
+          </li>
+          <li>
+            Чат-модели: <code>config/ai.ts</code> → <code>aiai.models</code>
+          </li>
+          <li>
+            TTS модели/голоса:{' '}
+            <code>config/speech.ts</code> → <code>aiai.models</code>
           </li>
         </ol>
       </section>

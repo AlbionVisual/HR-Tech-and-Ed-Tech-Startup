@@ -1,4 +1,7 @@
 import { ModelSelect } from './ModelSelect'
+import { TtsSelect } from './TtsSelect'
+import { TtsVoiceSelect } from './TtsVoiceSelect'
+import { VoiceToggle } from './VoiceToggle'
 
 type Props = {
   title: string
@@ -11,7 +14,10 @@ export function TopBar({ title, onMenuClick }: Props) {
       <h1 className="m-0 min-w-0 flex-none truncate text-[1.1rem] font-semibold">
         {title}
       </h1>
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <VoiceToggle />
+        <TtsSelect />
+        <TtsVoiceSelect />
         <ModelSelect />
         <button
           type="button"

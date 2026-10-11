@@ -16,33 +16,6 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function stripFeedbackMarker(text: string) {
-  const marker = config.prompts.feedbackMarker
-  const trimmed = text.trimEnd()
-  let content = trimmed
-  let hasMarker = false
-
-  if (trimmed.endsWith(marker)) {
-    content = trimmed.slice(0, -marker.length).trimEnd()
-    hasMarker = true
-  } else {
-    const idx = trimmed.lastIndexOf(marker)
-    if (idx >= 0 && idx + marker.length === trimmed.length) {
-      content = trimmed.slice(0, idx).trimEnd()
-      hasMarker = true
-    }
-  }
-
-  if (!hasMarker) return { content: text, isFeedback: false }
-
-  const looksLikeQuestion = /[?？]\s*$/.test(content)
-  if (looksLikeQuestion) {
-    return { content, isFeedback: false }
-  }
-
-  return { content, isFeedback: true }
-}
-
 export function useInterviewSession() {
   const [phase, setPhase] = useState<InterviewPhase>('idle')
   const [mode, setMode] = useState<InterviewMode | null>(null)
@@ -53,7 +26,7 @@ export function useInterviewSession() {
   )
   const [error, setError] = useState('')
   const [thought, setThought] = useState('')
-  const [progress] = useState(0)
+  const [progress, setProgress] = useState(0)
   const systemRef = useRef('')
   const abortRef = useRef(0)
 
@@ -87,6 +60,7 @@ export function useInterviewSession() {
     setMessages([])
     setError('')
     setThought('')
+    setProgress(0)
     setPhase('interviewing')
     await runAssistantTurn([
       { role: 'user', content: config.prompts.firstUserKickoff },
@@ -148,10 +122,11 @@ export function useInterviewSession() {
           for await (const piece of typewriter(event.text, tw)) {
             if (runId !== abortRef.current) return
             assembled += piece
-            const preview = stripFeedbackMarker(assembled).content
+            const preview = config.prompts.parseAssistantMarkers(assembled)
+            if (preview.progress != null) setProgress(preview.progress)
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantId ? { ...m, content: preview } : m,
+                m.id === assistantId ? { ...m, content: preview.content } : m,
               ),
             )
           }
@@ -163,7 +138,8 @@ export function useInterviewSession() {
             setError('Модель вернула пустой ответ')
             return
           }
-          const parsed = stripFeedbackMarker(assembled)
+          const parsed = config.prompts.parseAssistantMarkers(assembled)
+          if (parsed.progress != null) setProgress(parsed.progress)
           setMessages((prev) => {
             const exists = prev.some((m) => m.id === assistantId)
             if (!exists) {
@@ -232,6 +208,7 @@ export function useInterviewSession() {
     setStatus('idle')
     setError('')
     setThought('')
+    setProgress(0)
     systemRef.current = ''
   }
 

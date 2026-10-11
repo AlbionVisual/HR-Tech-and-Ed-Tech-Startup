@@ -23,6 +23,8 @@ function cleanUrl() {
     'g',
     'openrouter',
     'or',
+    'aiai',
+    'a',
     'model',
     'm',
     'provider',
@@ -37,6 +39,7 @@ export function bootstrapFromUrl() {
   const params = readParams()
   const gemini = params.get('gemini') || params.get('g')
   const openrouter = params.get('openrouter') || params.get('or')
+  const aiai = params.get('aiai') || params.get('a')
   const model = params.get('model') || params.get('m')
   const provider = (params.get('provider') || params.get('p')) as
     | AiProviderId
@@ -52,20 +55,29 @@ export function bootstrapFromUrl() {
     setByokKey(openrouter, 'openrouter')
     changed = true
   }
+  if (aiai?.trim()) {
+    setByokKey(aiai, 'aiai')
+    changed = true
+  }
 
   if (model?.trim()) {
     if (model.includes('::')) {
       setSelectedModelId(model.trim())
-    } else if (provider === 'gemini' || provider === 'openrouter' || provider === 'aiai') {
+    } else if (
+      provider === 'gemini' ||
+      provider === 'openrouter' ||
+      provider === 'aiai'
+    ) {
       setSelectedModelId(makeModelId(provider, model.trim()))
-    } else if (openrouter || gemini) {
-      const p: AiProviderId = openrouter ? 'openrouter' : 'gemini'
+    } else if (aiai || openrouter || gemini) {
+      const p: AiProviderId = aiai
+        ? 'aiai'
+        : openrouter
+          ? 'openrouter'
+          : 'gemini'
       setSelectedModelId(makeModelId(p, model.trim()))
     }
     changed = true
-  } else if (provider === 'gemini' || provider === 'openrouter' || provider === 'aiai') {
-    // only provider hint without model — selection resolves via preferred later
-    changed = changed || Boolean(gemini || openrouter)
   }
 
   if (changed) {
@@ -80,6 +92,7 @@ export function buildSetupLink(input: {
   origin?: string
   gemini?: string
   openrouter?: string
+  aiai?: string
   model?: string
   provider?: AiProviderId
   useHash?: boolean
@@ -88,6 +101,7 @@ export function buildSetupLink(input: {
   const params = new URLSearchParams()
   if (input.gemini) params.set('gemini', input.gemini)
   if (input.openrouter) params.set('openrouter', input.openrouter)
+  if (input.aiai) params.set('aiai', input.aiai)
   if (input.model) params.set('model', input.model)
   if (input.provider) params.set('provider', input.provider)
   const q = params.toString()

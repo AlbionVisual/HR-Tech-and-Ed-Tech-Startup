@@ -1,0 +1,45 @@
+interface SpeechRecognition extends EventTarget {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  maxAlternatives: number
+  start: () => void
+  stop: () => void
+  abort: () => void
+  onaudiostart: ((ev: Event) => void) | null
+  onaudioend: ((ev: Event) => void) | null
+  onend: ((ev: Event) => void) | null
+  onerror: ((ev: SpeechRecognitionErrorEvent) => void) | null
+  onnomatch: ((ev: Event) => void) | null
+  onresult: ((ev: SpeechRecognitionEvent) => void) | null
+  onsoundstart: ((ev: Event) => void) | null
+  onsoundend: ((ev: Event) => void) | null
+  onspeechstart: ((ev: Event) => void) | null
+  onspeechend: ((ev: Event) => void) | null
+  onstart: ((ev: Event) => void) | null
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number
+  results: SpeechRecognitionResultList
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string
+  message: string
+}
+
+declare var SpeechRecognition: {
+  prototype: SpeechRecognition
+  new (): SpeechRecognition
+}
+
+declare var webkitSpeechRecognition: {
+  prototype: SpeechRecognition
+  new (): SpeechRecognition
+}
+
+interface Window {
+  SpeechRecognition?: typeof SpeechRecognition
+  webkitSpeechRecognition?: typeof webkitSpeechRecognition
+}

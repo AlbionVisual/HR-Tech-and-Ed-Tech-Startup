@@ -18,9 +18,13 @@ export const aiConfig = {
   openrouter: {
     models: [
       'nvidia/nemotron-3-ultra-550b-a55b:free',
+      'poolside/laguna-s-2.1:free',
       'nvidia/nemotron-3.5-lightning:free',
-      'google/gemma-4-31b-it:free',
-      'google/gemma-4-26b-a4b-it:free',
+      'dots-studio/dots-3-note-preview:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'apodex/apodex-1.1-mini:free',
+      'thinkingmachines/inkling:free',
+      'cohere/north-mini-code:free',
     ],
     defaultModel: 'nvidia/nemotron-3-ultra-550b-a55b:free',
     baseUrl: 'https://openrouter.ai/api/v1',
@@ -28,11 +32,11 @@ export const aiConfig = {
     appName: 'Interview MVP',
   },
   aiai: {
-    baseUrl: '',
-    models: [] as string[],
-    defaultModel: '',
+    baseUrl: 'https://api.aiai.by/v1',
+    models: ['gemini-3.5-flash-lite', 'deepseek-v4.1-flash'],
+    defaultModel: 'gemini-3.5-flash-lite',
   },
-  byok: {
+  byok: {п
     storageKeyPrefix: 'mvp.ai.byokKey',
   },
 }

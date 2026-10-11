@@ -26,7 +26,7 @@ export async function* chatStream(
     yield {
       type: 'error',
       message:
-        'Нет API-ключа для выбранной модели. Добавьте ключ Gemini и/или OpenRouter в Профиле.',
+        'Нет API-ключа для выбранной модели. Добавьте ключ в Профиле (Gemini / OpenRouter / AIAI.BY).',
     }
     return
   }

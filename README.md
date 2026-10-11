@@ -1,57 +1,32 @@
 # HR-Tech-and-Ed-Tech-Startup
 
+MVP тренажёра собеседования: только фронт (Vite + React), ключи API в `localStorage` (BYOK), опционально голос (TTS + распознавание речи в браузере).
+
 ## Структура
 
 ```
-mvp-front/                                  # Прототип приложения, только фронт
+mvp-front/                                  # Прототип, только фронт
     src/
-        App.tsx                                     # Точка входа в приложение, state текущей вкладки, общие элементы приложения
+        App.tsx
         main.tsx
-        components/                                 # Части общие для приложения
+        components/                             # Общие куски UI
             TopBar.tsx
             BottomNav.tsx
-            ModelSelect.tsx
-        config/                                     # Все настройки рекомендуется хранить в одном месте
-            index.ts
+            ModelSelect.tsx                     # Чат-модель
+            TtsSelect.tsx / TtsVoiceSelect.tsx  # TTS модель и голос
+            VoiceToggle.tsx
+        config/                                 # Единый источник настроек
+            ai.ts                                   # Чат-модели Gemini / OpenRouter / AIAI
+            speech.ts                               # TTS-модели и списки голосов
+            prompts.ts
             app.ts
-            ai.ts                                       # Модели Gemini / OpenRouter — править здесь
-            prompts.ts                                  # Тексты промптов
-        pages/                                      # Странички приложения
-            TestsPage.tsx
-            ResumePage.tsx
-            InterviewPage.tsx
-            ProfilePage.tsx
-        features/                                   # Индивидуальный код для каждой из страничек
-            interview/
-                useInterviewSession.ts                      # Мозг, фазы, стрим, остальное - UI куски
-                InterviewStart.tsx
-                VacancySheet.tsx
-                InterviewProgress.tsx
-                ChatView.tsx
-                MessageBubble.tsx
-                Composer.tsx
-                ThinkingIndicator.tsx
-                FeedbackActions.tsx
-        ai/                                         # Код для работы с ИИ
-            client.ts                                   # Фасад
-            byok.ts                                     # get/set ключа в localStorage
-            bootstrapFromUrl.ts                         # Ключи/модель из query или hash ссылки
-            selection.ts                                # Выбор модели в шапке
-            types.ts
-            providers/
-                gemini.ts
-                openrouter.ts
-                aiai.ts
-                types.ts
-            stream/
-                parseSse.ts
-                typewriter.ts
-        ui/
-            btn.ts                                      # Общие tailwind-классы кнопок/полей
-        styles/                                     # Tailwind + место под кастомный CSS
-            tokens.css                                  # @import tailwind + theme
-            shell.css                                   # пусто / кастом оболочки
-            interview.css                               # анимации и кастом интервью
+        pages/
+            InterviewPage.tsx / ProfilePage.tsx / …
+        features/interview/                     # Фазы, чат, композер
+        ai/                                     # Провайдеры чата, BYOK, стрим
+        speech/                                 # TTS / STT / VoiceContext
+        ui/ / styles/
+docs/                                       # Сборка под GitHub Pages
 README.md
 ```
 
@@ -63,25 +38,11 @@ npm install
 npm run dev
 ```
 
-Обычный билд (папка `mvp-front/dist`):
+Dev-сервер — **HTTPS** (self-signed через `@vitejs/plugin-basic-ssl`), чтобы микрофон работал и по LAN-IP с телефона. В браузере один раз примите предупреждение о сертификате.
+
+Обычный билд → `mvp-front/dist`:
 
 ```
 cd mvp-front
 npm run build
-```
-
-## GitHub Pages
-
-Скрипт кладёт готовый сайт в корень репозитория, в `docs/`:
-
-```
-cd mvp-front
-npm run build:pages
-```
-
-Проверить локально что будет в pages (http://localhost:4173/HR-Tech-and-Ed-Tech-Startup/):
-
-```
-cd mvp-front
-npm run preview:pages
 ```
