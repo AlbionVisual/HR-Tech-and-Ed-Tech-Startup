@@ -1,24 +1,24 @@
 import type { PageId } from '../config'
-import { config } from '../config'
+import { config, publicUrl } from '../config'
 
 const icons: Record<string, { active: string; inactive: string }> = {
   tests: {
-    active: '/icons/tests-active.png',
-    inactive: '/icons/tests-inactive.png',
+    active: publicUrl('icons/tests-active.png'),
+    inactive: publicUrl('icons/tests-inactive.png'),
   },
   resume: {
-    active: '/icons/resume-active.png',
-    inactive: '/icons/resume-inactive.png',
+    active: publicUrl('icons/resume-active.png'),
+    inactive: publicUrl('icons/resume-inactive.png'),
   },
   interview: {
-    active: '/icons/interview-active.png',
-    inactive: '/icons/interview-inactive.png',
+    active: publicUrl('icons/interview-active.png'),
+    inactive: publicUrl('icons/interview-inactive.png'),
   },
   profile: {
-    active: '/icons/profile-active.png',
-    inactive: '/icons/profile-inactive.png',
+    active: publicUrl('icons/profile-active.png'),
+    inactive: publicUrl('icons/profile-inactive.png'),
   },
-};
+}
 
 type Props = {
 	active: PageId

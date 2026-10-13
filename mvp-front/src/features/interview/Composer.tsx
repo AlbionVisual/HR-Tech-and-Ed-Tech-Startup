@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { publicUrl } from '../../config'
 import { useVoice } from '../../speech/VoiceContext'
 import { btn, btnPrimary } from '../../ui/btn'
 
@@ -86,7 +87,7 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 				title={expanded ? 'Свернуть' : 'Развернуть'}
 			>
 				<img
-					src={'/icons/resize-button.png'}
+					src={publicUrl('icons/resize-button.png')}
 					alt="Изменить размер"
 					className="w-5 h-5 object-contain"
 				/>
@@ -170,8 +171,8 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 					<img
 						src={
 							text.trim() && !disabled && !listening
-								? '/icons/send-button-active.png'
-								: '/icons/send-button-inactive.png'
+								? publicUrl('icons/send-button-active.png')
+								: publicUrl('icons/send-button-inactive.png')
 						}
 						alt="Отправить"
 						className="w-9 h-9 object-contain"

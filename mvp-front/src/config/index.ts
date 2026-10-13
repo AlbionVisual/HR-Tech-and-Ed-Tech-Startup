@@ -1,4 +1,4 @@
-import { appConfig } from './app'
+import { appConfig, publicUrl } from './app'
 import {
   aiConfig,
   getProviderDefaultModel,
@@ -28,6 +28,7 @@ export {
   getProviderModels,
   makeTtsId,
   parseTtsId,
+  publicUrl,
   voicesForTts,
 }
 export type { PageId } from './app'

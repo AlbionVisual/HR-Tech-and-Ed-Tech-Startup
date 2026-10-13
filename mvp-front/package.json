@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:pages": "tsc -b && vite build --base / --outDir ../docs --emptyOutDir",
+    "build:pages": "tsc -b && vite build --base /HR-Tech-and-Ed-Tech-Startup/ --outDir ../docs --emptyOutDir",
     "preview": "vite preview",
     "preview:pages": "vite preview --base /HR-Tech-and-Ed-Tech-Startup/ --outDir ../docs",
     "lint": "eslint ."
