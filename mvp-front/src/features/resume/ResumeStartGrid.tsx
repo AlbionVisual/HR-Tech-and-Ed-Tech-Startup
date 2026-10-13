@@ -29,9 +29,9 @@ export function ResumeStartGrid({
 
   const getCardStyle = (cardMode: ResumeMode) => {
     if (mode === cardMode) {
-      return 'border-emerald-500 bg-emerald-50/80 text-emerald-950 shadow-sm'
+      return 'border-[#FE502D] bg-emerald-100 text-emerald-950 shadow-sm'
     }
-    return 'border-orange-500 bg-white hover:bg-orange-50/40 text-gray-900'
+    return 'border-[#FE502D] bg-white hover:bg-orange-50/40 text-gray-900'
   }
 
   const headerText = mode

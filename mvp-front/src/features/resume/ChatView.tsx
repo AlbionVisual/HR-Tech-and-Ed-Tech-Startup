@@ -3,7 +3,7 @@ import type { ChatMessage } from '../../ai/types'
 import { useVoice } from '../../speech/VoiceContext'
 import { ChatMessageList } from './ChatMessageList'
 import { Composer } from '../interview/Composer'
-import { FeedbackActions } from '../interview/FeedbackActions'
+// import { FeedbackActions } from '../interview/FeedbackActions'
 import { ResumeStartGrid } from './ResumeStartGrid'
 import type { ResumeMode, ResumePhase } from './useResumeSession'
 
@@ -36,7 +36,6 @@ export function ChatView({
 	onChooseFormatting,
 	onStartCheck,
 	onSend,
-	onRefine,
 }: Props) {
 	const listRef = useRef<HTMLDivElement>(null)
 	const stickRef = useRef(true)
@@ -88,12 +87,11 @@ export function ChatView({
 				)}
 			</div>
 
-			{phase === 'awaiting_next' ? (
-				<FeedbackActions onRefine={onRefine} onNext={() => { }} />
-			) : (
+			{phase === 'awaiting_next' ? 1 : (
 				<Composer
 					disabled={busy}
 					onSend={handleSubmit}
+					textPlaceholder = {'Отправьте резюме'}
 				/>
 			)}
 		</div>

@@ -1,49 +1,69 @@
 import type { PageId } from '../config'
 import { config } from '../config'
 
+const icons: Record<string, { active: string; inactive: string }> = {
+  tests: {
+    active: '/icons/tests-active.png',
+    inactive: '/icons/tests-inactive.png',
+  },
+  resume: {
+    active: '/icons/resume-active.png',
+    inactive: '/icons/resume-inactive.png',
+  },
+  interview: {
+    active: '/icons/interview-active.png',
+    inactive: '/icons/interview-inactive.png',
+  },
+  profile: {
+    active: '/icons/profile-active.png',
+    inactive: '/icons/profile-inactive.png',
+  },
+};
+
 type Props = {
 	active: PageId
 	onChange: (id: PageId) => void
 }
 
 export function BottomNav({ active, onChange }: Props) {
-	return (
-		<nav
-			className="grid grid-cols-4 w-full border-t border-line bg-bg-elevated p-1.5 sm:p-2"
-			aria-label="Навигация">
+  return (
+    <nav
+      className="
+        relative flex items-center justify-around w-full max-w-md mx-auto bg-[#f5f3ef] px-3 py-2 rounded-t-3xl shadow-lg border-t border-line
+        sm:grid sm:grid-cols-4 sm:max-w-none sm:mx-0 sm:rounded-none sm:px-2 sm:py-2 sm:shadow-none
+      "
+      aria-label="Навигация"
+    >
 
-			{config.app.pages.map((page) => {
-				console.log(page)
-				const isActive = active === page.id
-				const isTests = page.id === 'tests'
+      {config.app.pages.map((page) => {
+        const isActive = active === page.id;
+        const pageIcons = icons[page.id] || { active: '', inactive: '' };
 
-				return (
-					<button
-						key={page.id}
-						type="button"
-						onClick={() => onChange(page.id)}
-						className={`relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2.5 px-2 sm:px-4 rounded-2xl transition-all duration-200 border-0 font-sans text-xs sm:text-sm ${isActive
-							? 'bg-bg-panel font-semibold text-ink shadow-sm'
-							: 'bg-transparent text-muted hover:text-ink hover:bg-bg-panel/50'
-							}`}>
+        return (
+          <button
+            key={page.id}
+            type="button"
+            onClick={() => onChange(page.id)}
+            className={`
+              relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 
+              py-2 px-3 sm:px-4 rounded-2xl transition-all duration-200 border-0 font-sans text-xs sm:text-sm cursor-pointer
+              ${
+                isActive
+                  ? 'bg-white sm:bg-bg-panel font-semibold text-[#ff5722] sm:text-ink shadow-sm'
+                  : 'bg-transparent text-gray-500 hover:text-gray-800 hover:bg-black/5'
+              }
+            `}
+          >
+            <img
+              src={isActive ? pageIcons.active : pageIcons.inactive}
+              alt={page.title}
+              className="w-6 h-6 sm:w-5 sm:h-5 object-contain transition-transform"
+            />
 
-						<span className="text-base sm:text-lg">
-							{page.id === 'tests' && '📋'}
-							{page.id === 'resume' && '📄'}
-							{page.id === 'interview' && '💬'}
-							{page.id === 'profile' && '👤'}
-						</span>
-
-						<span className="truncate">{page.title}</span>
-
-						{isTests && (
-							<span className="absolute -top-1 right-1 sm:top-1 sm:right-2 bg-orange-500 text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-								скоро
-							</span>
-						)}
-					</button>
-				)
-			})}
-		</nav>
-	)
+            <span className="truncate">{page.title}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
 }
