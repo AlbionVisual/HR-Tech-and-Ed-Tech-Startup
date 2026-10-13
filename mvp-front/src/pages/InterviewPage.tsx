@@ -11,7 +11,10 @@ export function InterviewPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+
+	 <div className="w-full max-w-xl mx-auto px-4">
       {inChat ? <InterviewProgress value={session.progress} /> : null}
+	 </div>
 
       {session.phase === 'idle' || session.phase === 'vacancy_form' ? (
         <InterviewStart
