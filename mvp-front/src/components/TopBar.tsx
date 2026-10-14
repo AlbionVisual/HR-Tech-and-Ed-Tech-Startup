@@ -25,7 +25,7 @@ export function TopBar({ title }: Props) {
 				<ModelSelect />
 				<button
 					type="button"
-					className="grid h-10 w-10 place-content-center gap-1 rounded-lg border border-line bg-bg-panel"
+					className="grid h-10 w-10 place-content-center gap-1 rounded-xl border border-[#b6b3ad] bg-[#f5f3ef] hover:bg-[#ede9e2] transition-colors cursor-pointer shadow-sm"
 					aria-label="Меню"
 					onClick={() => setIsMenuOpen(true)}
 				>
@@ -33,7 +33,9 @@ export function TopBar({ title }: Props) {
 					<span className="block h-0.5 w-4 bg-ink" />
 					<span className="block h-0.5 w-4 bg-ink" />
 				</button>
+
 			</div>
+
 			<SideMenu isOpen={isMenuOpen}
 				onClose={() => setIsMenuOpen(false)} />
 		</header>
