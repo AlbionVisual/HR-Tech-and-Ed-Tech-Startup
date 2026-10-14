@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { chatStream } from '../../ai/client'
 import { typewriter } from '../../ai/stream/typewriter'
 import type { ChatMessage } from '../../ai/types'
 import { config, type VacancyContext, type VacancyGrade } from '../../config'
+import { saveChat, getChat, createChatRecord } from './chatStorage'
 
 export type InterviewMode = 'vacancy' | 'practice'
 
@@ -16,7 +17,7 @@ function uid() {
 	return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export function useInterviewSession() {
+export function useInterviewSession(chatId?: string | null) {
 	const [phase, setPhase] = useState<InterviewPhase>('idle')
 	const [mode, setMode] = useState<InterviewMode | null>(null)
 	const [vacancy, setVacancy] = useState<VacancyContext | null>(null)
@@ -29,6 +30,11 @@ export function useInterviewSession() {
 	const [progress, setProgress] = useState(0)
 	const systemRef = useRef('')
 	const abortRef = useRef(0)
+
+	const [currentChatId, setCurrentChatId] = useState<string | null>(chatId ?? null)
+	const [createdAtRef, setCreatedAtRef] = useState<number>(Date.now())
+	const [isLoaded, setIsLoaded] = useState(false)
+	const prevChatIdRef = useRef<string | null | undefined>(chatId)
 
 	function chooseVacancyPrep() {
 		setMode('vacancy')
@@ -57,6 +63,12 @@ export function useInterviewSession() {
 		systemRef.current = system
 		setMode(nextMode)
 		setVacancy(nextVacancy)
+
+		// Создаём новую запись чата в localStorage
+		const chat = createChatRecord(nextMode, nextVacancy)
+		setCurrentChatId(chat.id)
+		setCreatedAtRef(chat.createdAt)
+
 		setMessages([])
 		setError('')
 		setThought('')
@@ -212,6 +224,78 @@ export function useInterviewSession() {
 		systemRef.current = ''
 	}
 
+	function startNewChat() {
+		setCurrentChatId(null)
+		reset()
+	}
+
+	// Загрузка чата при смене chatId
+	useEffect(() => {
+		const prevChatId = prevChatIdRef.current
+
+		if (!chatId) {
+			// Переход на "новый чат" — если раньше был активный чат, сбрасываем
+			if (prevChatId != null) {
+				reset()
+			}
+			setCurrentChatId(null)
+			setIsLoaded(true)
+			prevChatIdRef.current = chatId
+			return
+		}
+
+		// Загрузка конкретного чата
+		const snapshot = getChat(chatId)
+		if (snapshot) {
+			setMode(snapshot.mode)
+			setPhase(snapshot.phase === 'idle' ? 'idle' : snapshot.phase)
+			setVacancy(snapshot.vacancy)
+			setMessages(snapshot.messages)
+			setProgress(snapshot.progress)
+			setCurrentChatId(snapshot.id)
+			setCreatedAtRef(snapshot.createdAt)
+			systemRef.current = config.prompts.buildInterviewSystemPrompt({
+				mode: snapshot.mode,
+				vacancy: snapshot.vacancy,
+			})
+		} else {
+			if (prevChatId != null) {
+				reset()
+			}
+			setCurrentChatId(null)
+		}
+		setIsLoaded(true)
+		prevChatIdRef.current = chatId
+	}, [chatId])
+
+	// Авто-сохранение при изменении состояния
+	useEffect(() => {
+		if (!currentChatId || !isLoaded) return
+		if (phase === 'idle' && messages.length === 0) return
+
+		const snapshot = {
+			id: currentChatId,
+			title: mode === 'practice' ? 'Тренировка' : `Вакансия: ${vacancy?.company ?? ''}`,
+			createdAt: createdAtRef,
+			updatedAt: Date.now(),
+			mode: mode ?? 'practice',
+			phase,
+			vacancy,
+			messages,
+			progress,
+		}
+		saveChat(snapshot)
+	}, [
+		currentChatId,
+		phase,
+		mode,
+		vacancy,
+		messages,
+		progress,
+		isLoaded,
+		createdAtRef,
+	])
+
 	return {
 		phase,
 		mode,
@@ -221,6 +305,8 @@ export function useInterviewSession() {
 		error,
 		thought,
 		progress,
+		chatId: currentChatId,
+		isLoaded,
 		chooseVacancyPrep,
 		choosePractice,
 		closeVacancyForm,
@@ -229,5 +315,6 @@ export function useInterviewSession() {
 		refineAnswer,
 		nextQuestion,
 		reset,
+		startNewChat,
 	}
 }

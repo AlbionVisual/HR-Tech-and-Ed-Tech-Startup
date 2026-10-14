@@ -8,6 +8,12 @@ export const appConfig = {
     { id: 'profile' as const, title: 'Профиль' },
   ],
   defaultPage: 'interview' as PageId,
+  interview: {
+    chats: {
+      storageKey: 'mvp.interview.chats',
+      maxChats: 50,
+    },
+  },
 }
 
 /** Путь к файлу из public/ с учётом Vite base (GitHub Pages). */
