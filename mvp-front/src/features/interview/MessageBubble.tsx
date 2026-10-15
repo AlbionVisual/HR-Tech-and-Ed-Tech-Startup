@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../ai/types'
-import { useVoice } from '../../speech/VoiceContext'
+// import { useVoice } from '../../speech/VoiceContext'
 
 type Props = {
 	message: ChatMessage
@@ -7,17 +7,18 @@ type Props = {
 
 export function MessageBubble({ message }: Props) {
 	const isUser = message.role === 'user'
-	const {
-		enabled,
-		speak,
-		stopAll,
-		playingMessageId,
-		speaking,
-		preparing,
-	} = useVoice()
-	const active = playingMessageId === message.id
-	const isPreparing = active && preparing
-	const isPlaying = active && speaking
+	// Озвучка временно скрыта
+	// const {
+	// 	enabled,
+	// 	speak,
+	// 	stopAll,
+	// 	playingMessageId,
+	// 	speaking,
+	// 	preparing,
+	// } = useVoice()
+	// const active = playingMessageId === message.id
+	// const isPreparing = active && preparing
+	// const isPlaying = active && speaking
 
 	return (
 		<div
@@ -26,6 +27,7 @@ export function MessageBubble({ message }: Props) {
 				}`}
 		>
 			<p className="m-0 wrap-break-word whitespace-pre-wrap">{message.content}</p>
+			{/* Озвучка временно скрыта
 			{!isUser && enabled && message.content.trim() ? (
 				<label className="mt-2 flex cursor-pointer items-center gap-1.5 text-[0.8rem] text-muted">
 					<input
@@ -39,17 +41,18 @@ export function MessageBubble({ message }: Props) {
 								stopAll()
 							}
 						}}
-						aria-label="Проиграть сообщение"
+						aria-label="Прослушать сообщение"
 					/>
 					<span>
 						{isPreparing
 							? 'Думаю, как сказать красивее…'
 							: isPlaying
 								? 'Играет…'
-								: 'Проиграть'}
+								: 'Прослушать'}
 					</span>
 				</label>
 			) : null}
+			*/}
 		</div>
 	)
 }

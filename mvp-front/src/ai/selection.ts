@@ -46,11 +46,11 @@ function providerHasKey(provider: AiProviderId) {
 }
 
 export function listAvailableModels(): ModelOption[] {
-  const providers: AiProviderId[] = ['mock', 'openrouter', 'gemini', 'aiai']
+  const providers: AiProviderId[] = ['openrouter', 'gemini', 'aiai']
   const options: ModelOption[] = []
 
   for (const provider of providers) {
-    if (provider !== 'mock' && !providerHasKey(provider)) continue
+    if (!providerHasKey(provider)) continue
     for (const model of getProviderModelDefs(provider)) {
       if (!model.id) continue
       options.push({

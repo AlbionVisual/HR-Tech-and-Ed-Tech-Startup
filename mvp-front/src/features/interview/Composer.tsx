@@ -22,19 +22,13 @@ export function Composer({ disabled, onSend, textPlaceholder, value }: Props) {
 	const [micError, setMicError] = useState('')
 	const ref = useRef<HTMLTextAreaElement>(null)
 	const {
-		enabled,
-		preparing,
-		speaking,
 		listening,
-		voiceError,
 		heardInsert,
 		sttSupported,
 		startMic,
-		stopAll,
 		stopMic,
 		consumeHeardInsert,
 	} = useVoice()
-	const ttsBusy = preparing || speaking
 
 	useEffect(() => {
 		if (value !== undefined) {
@@ -105,15 +99,7 @@ export function Composer({ disabled, onSend, textPlaceholder, value }: Props) {
 						? 'flex-1 w-full overflow-auto bg-transparent pr-12 pt-2 pb-12 font-sans text-ink outline-none'
 						: 'flex-1 w-full overflow-hidden bg-transparent pr-12 pt-2 pb-10 font-sans text-ink outline-none'
 				}
-				placeholder={
-					listening
-						? 'Слушаю…'
-						: preparing
-							? 'Думаю, как сказать красивее…'
-							: speaking
-								? 'ИИ говорит…'
-								: textPlaceholder
-				}
+				placeholder={listening ? 'Слушаю…' : textPlaceholder}
 				value={text}
 				disabled={disabled || listening}
 				rows={2}
@@ -130,73 +116,42 @@ export function Composer({ disabled, onSend, textPlaceholder, value }: Props) {
 			/>
 
 			{micError ? <p className="m-0 text-[0.85rem] text-danger">{micError}</p> : null}
-			{voiceError ? <p className="m-0 text-[0.85rem] text-danger">{voiceError}</p> : null}
 
 			<div className="absolute bottom-5 right-5 flex items-center gap-2">
-				{enabled ? (
-					<>
-						<button
-							type="button"
-							className="grid h-9 w-9 place-content-center rounded-full bg-black/5 text-ink transition-colors hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-40"
-							onClick={() => stopAll()}
-							disabled={!ttsBusy && !listening}
-							title="Замолчи"
-							aria-label="Замолчи"
-						>
-							<svg
-								viewBox="0 0 24 24"
-								className="h-5 w-5"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="1.8"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								aria-hidden="true"
-							>
-								<path d="M9 9v3a3 3 0 0 0 6 0v-1" />
-								<path d="M5 10v1a7 7 0 0 0 10.5 6" />
-								<path d="M19 10v1a7 7 0 0 1-.6 2.8" />
-								<path d="M12 19v3" />
-								<path d="M8 22h8" />
-								<path d="M4 4l16 16" />
-							</svg>
-						</button>
-
-						<button
-							type="button"
-							className={`grid h-9 w-9 place-content-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${listening
-								? 'bg-accent text-white'
-								: 'bg-black/5 text-ink hover:bg-black/10'
-								}`}
-							onClick={() => void onMicClick()}
-							disabled={disabled || !sttSupported || ttsBusy}
-							title={
-								sttSupported
-									? listening
-										? 'Остановить микрофон'
-										: 'Говорить'
-									: 'Speech recognition недоступен'
-							}
-							aria-label={listening ? 'Остановить микрофон' : 'Микрофон'}
-						>
-							<svg
-								viewBox="0 0 24 24"
-								className="h-5 w-5"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="1.8"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								aria-hidden="true"
-							>
-								<rect x="9" y="3" width="6" height="11" rx="3" />
-								<path d="M5 11a7 7 0 0 0 14 0" />
-								<path d="M12 18v3" />
-								<path d="M8 22h8" />
-							</svg>
-						</button>
-					</>
-				) : null}
+				{/* Кнопка «Замолчи» (TTS) временно скрыта */}
+				<button
+					type="button"
+					className={`grid h-9 w-9 place-content-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${listening
+						? 'bg-accent text-white'
+						: 'bg-black/5 text-ink hover:bg-black/10'
+						}`}
+					onClick={() => void onMicClick()}
+					disabled={disabled || !sttSupported}
+					title={
+						sttSupported
+							? listening
+								? 'Остановить микрофон'
+								: 'Говорить'
+							: 'Speech recognition недоступен'
+					}
+					aria-label={listening ? 'Остановить микрофон' : 'Микрофон'}
+				>
+					<svg
+						viewBox="0 0 24 24"
+						className="h-5 w-5"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.8"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						aria-hidden="true"
+					>
+						<rect x="9" y="3" width="6" height="11" rx="3" />
+						<path d="M5 11a7 7 0 0 0 14 0" />
+						<path d="M12 18v3" />
+						<path d="M8 22h8" />
+					</svg>
+				</button>
 
 				<button
 					type="button"

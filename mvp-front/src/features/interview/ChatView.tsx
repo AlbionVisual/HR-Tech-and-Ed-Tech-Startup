@@ -30,17 +30,17 @@ export function ChatView({
 }: Props) {
 	const listRef = useRef<HTMLDivElement>(null)
 	const stickRef = useRef(true)
-	const prevStatus = useRef(status)
-	const spokenIdRef = useRef<string | null>(null)
-	const { enabled, speak, stopAll, preparing, speaking, listening, voiceError } =
-		useVoice()
+	// const prevStatus = useRef(status)
+	// const spokenIdRef = useRef<string | null>(null)
+	const { stopAll } = useVoice()
+	// const { enabled, speak, preparing, speaking, listening, voiceError } = useVoice()
 	const busy = status === 'thinking' || status === 'streaming'
 	const canType = phase === 'interviewing' && !busy
 	const showThinkingUi = status === 'thinking' || Boolean(thought)
-	const showStopBar =
-		enabled &&
-		phase === 'awaiting_next' &&
-		(preparing || speaking || listening)
+	// const showStopBar =
+	// 	enabled &&
+	// 	phase === 'awaiting_next' &&
+	// 	(preparing || speaking || listening)
 
 	const last = messages[messages.length - 1]
 	// Новый ход поверх старого ответа ассистента: thought снизу ленты.
@@ -62,21 +62,21 @@ export function ChatView({
 		el.scrollTop = el.scrollHeight
 	}, [messages, thought, status, error])
 
-	useEffect(() => {
-		const prev = prevStatus.current
-		prevStatus.current = status
-		if (!enabled) return
-		if (status !== 'idle') return
-		if (prev !== 'streaming' && prev !== 'thinking') return
-		if (!last || last.role !== 'assistant' || !last.content.trim()) return
-		if (spokenIdRef.current === last.id) return
-		spokenIdRef.current = last.id
-
-		void speak(last.content, {
-			messageId: last.id,
-			listenAfter: phase === 'interviewing',
-		})
-	}, [status, enabled, last, phase, speak])
+	// Озвучка временно отключена
+	// useEffect(() => {
+	// 	const prev = prevStatus.current
+	// 	prevStatus.current = status
+	// 	if (!enabled) return
+	// 	if (status !== 'idle') return
+	// 	if (prev !== 'streaming' && prev !== 'thinking') return
+	// 	if (!last || last.role !== 'assistant' || !last.content.trim()) return
+	// 	if (spokenIdRef.current === last.id) return
+	// 	spokenIdRef.current = last.id
+	// 	void speak(last.content, {
+	// 		messageId: last.id,
+	// 		listenAfter: phase === 'interviewing',
+	// 	})
+	// }, [status, enabled, last, phase, speak])
 
 	useEffect(() => {
 		if (busy) stopAll()
@@ -102,11 +102,12 @@ export function ChatView({
 				) : null}
 				{answer ? <MessageBubble message={answer} /> : null}
 				{error ? <p className="m-0 text-[0.9rem] text-danger">{error}</p> : null}
-				{voiceError ? (
+				{/* {voiceError ? (
 					<p className="m-0 text-[0.9rem] text-danger">{voiceError}</p>
-				) : null}
+				) : null} */}
 			</div>
 
+			{/* Озвучка временно скрыта
 			{showStopBar ? (
 				<div className="flex items-center justify-between gap-2 border-t border-line bg-bg-elevated px-3 py-2">
 					<span className="text-[0.85rem] text-muted">
@@ -127,6 +128,7 @@ export function ChatView({
 					</button>
 				</div>
 			) : null}
+			*/}
 			{phase === 'awaiting_next' ? (
 				<FeedbackActions onRefine={onRefine} onNext={onNext} />
 			) : (

@@ -55,13 +55,15 @@ const VoiceContext = createContext<VoiceContextValue | null>(null)
 const VOICE_EVENT = 'mvp-speech-settings'
 
 function readEnabled() {
-  try {
-    const v = localStorage.getItem(config.speech.voiceModeKey)
-    if (v === null) return true
-    return v === '1'
-  } catch {
-    return true
-  }
+  // Временно: озвучка полностью выключена (нет UI / автовоспроизведения)
+  return false
+  // try {
+  //   const v = localStorage.getItem(config.speech.voiceModeKey)
+  //   if (v === null) return true
+  //   return v === '1'
+  // } catch {
+  //   return true
+  // }
 }
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
@@ -191,6 +193,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   const speak = useCallback(
     async (text: string, options?: SpeakOptions) => {
+      if (!enabled) return
       const runId = ++runIdRef.current
       stopBrowserStt()
       setListening(false)

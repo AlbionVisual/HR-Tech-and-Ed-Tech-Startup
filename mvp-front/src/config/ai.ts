@@ -60,7 +60,7 @@ export const aiConfig = {
     defaultModel: 'gemini-3.5-flash-lite',
   },
   mock: {
-    models: [{ id: 'demo', label: 'имитация модели' }] satisfies AiModelDef[],
+    models: [] satisfies AiModelDef[],
     defaultModel: 'demo',
   },
   byok: {

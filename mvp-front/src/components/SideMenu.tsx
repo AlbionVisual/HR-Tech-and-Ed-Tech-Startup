@@ -6,9 +6,9 @@ import {
 	type ChatMeta,
 } from '../features/interview/chatStorage'
 import { ModelSelect } from './ModelSelect'
-import { TtsSelect } from './TtsSelect'
-import { TtsVoiceSelect } from './TtsVoiceSelect'
-import { VoiceToggle } from './VoiceToggle'
+// import { TtsSelect } from './TtsSelect'
+// import { TtsVoiceSelect } from './TtsVoiceSelect'
+// import { VoiceToggle } from './VoiceToggle'
 
 type SideMenuProps = {
 	isOpen: boolean
@@ -84,6 +84,7 @@ export function SideMenu({
 							<span>Модель чата</span>
 							<ModelSelect variant="panel" />
 						</label>
+						{/* Озвучка временно скрыта
 						<div className="flex items-center justify-between gap-2">
 							<span className="text-[0.75rem] text-muted">Озвучка</span>
 							<VoiceToggle />
@@ -96,6 +97,7 @@ export function SideMenu({
 							<span>Голос</span>
 							<TtsVoiceSelect variant="panel" />
 						</label>
+						*/}
 					</div>
 				</section>
 
