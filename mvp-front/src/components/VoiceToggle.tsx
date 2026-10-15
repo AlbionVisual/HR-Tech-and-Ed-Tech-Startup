@@ -13,7 +13,7 @@ export function VoiceToggle() {
       } ${unsupported ? 'opacity-50' : ''}`}
       title={
         unsupported
-          ? 'Голос недоступен в этом браузере'
+          ? 'Нет ни встроенного TTS, ни ключей Gemini/AIAI для озвучки'
           : 'Озвучка ответов ИИ и микрофон'
       }
     >
@@ -24,7 +24,7 @@ export function VoiceToggle() {
         disabled={unsupported}
         onChange={(e) => setEnabled(e.target.checked)}
       />
-      <span className="whitespace-nowrap">Говорилка</span>
+      <span className="whitespace-nowrap">Озвучка</span>
     </label>
   )
 }

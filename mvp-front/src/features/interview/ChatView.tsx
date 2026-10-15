@@ -43,10 +43,18 @@ export function ChatView({
 		(preparing || speaking || listening)
 
 	const last = messages[messages.length - 1]
-	const splitThoughtBeforeAnswer =
-		showThinkingUi && last?.role === 'assistant'
-	const ahead = splitThoughtBeforeAnswer ? messages.slice(0, -1) : messages
-	const answer = splitThoughtBeforeAnswer ? last : null
+	// Новый ход поверх старого ответа ассистента: thought снизу ленты.
+	// Текущий ход (стрим / готовый ответ с thought): thought ПЕРЕД этим ответом.
+	const newTurnOverOldAssistant =
+		status === 'thinking' &&
+		last?.role === 'assistant' &&
+		Boolean(last.content.trim())
+	const attachThoughtBeforeLast =
+		showThinkingUi &&
+		last?.role === 'assistant' &&
+		!newTurnOverOldAssistant
+	const ahead = attachThoughtBeforeLast ? messages.slice(0, -1) : messages
+	const answer = attachThoughtBeforeLast ? last : null
 
 	useEffect(() => {
 		const el = listRef.current

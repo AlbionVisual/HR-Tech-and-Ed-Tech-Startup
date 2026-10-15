@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BottomNav } from './components/BottomNav'
 import { TopBar } from './components/TopBar'
+import { AccessBanner } from './components/AccessBanner'
 import { config, type PageId } from './config'
 import { InterviewPage } from './pages/InterviewPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -43,6 +44,7 @@ function App() {
 					onNewChat={handleNewChat}
 				/>
 				<main className="min-h-0 overflow-auto">
+					<AccessBanner />
 					{page === 'tests' ? <TestsPage /> : null}
 					{page === 'resume' ? <ResumePage /> : null}
 					{page === 'interview' ? <InterviewPage chatId={activeChatId} /> : null}

@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
-import { deleteChat, INTERVIEW_CHATS_EVENT, listChats, type ChatMeta } from '../features/interview/chatStorage'
+import {
+	deleteChat,
+	INTERVIEW_CHATS_EVENT,
+	listChats,
+	type ChatMeta,
+} from '../features/interview/chatStorage'
+import { ModelSelect } from './ModelSelect'
+import { TtsSelect } from './TtsSelect'
+import { TtsVoiceSelect } from './TtsVoiceSelect'
+import { VoiceToggle } from './VoiceToggle'
 
 type SideMenuProps = {
 	isOpen: boolean
@@ -8,7 +17,12 @@ type SideMenuProps = {
 	onNewChat: () => void
 }
 
-export function SideMenu({ isOpen, onClose, onChatSelect, onNewChat }: SideMenuProps) {
+export function SideMenu({
+	isOpen,
+	onClose,
+	onChatSelect,
+	onNewChat,
+}: SideMenuProps) {
 	const [chats, setChats] = useState<ChatMeta[]>([])
 
 	useEffect(() => {
@@ -38,7 +52,8 @@ export function SideMenu({ isOpen, onClose, onChatSelect, onNewChat }: SideMenuP
 		const diff = now.getTime() - d.getTime()
 		if (diff < 60_000) return 'только что'
 		if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} мин назад`
-		if (diff < 86_400_000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+		if (diff < 86_400_000)
+			return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 		return d.toLocaleDateString()
 	}
 
@@ -49,23 +64,45 @@ export function SideMenu({ isOpen, onClose, onChatSelect, onNewChat }: SideMenuP
 				onClick={onClose}
 			/>
 
-			<div className="relative z-10 w-70 h-full bg-bg-panel border-l border-line shadow-xl flex flex-col p-5 animate-in slide-in-from-right duration-200">
-				<div className="flex items-center justify-between pb-4 border-b border-line">
-					<h2 className="text-lg font-semibold m-0">Чаты с ИИ</h2>
+			<div className="relative z-10 flex h-full w-70 flex-col border-l border-line bg-bg-panel p-5 shadow-xl animate-in slide-in-from-right duration-200">
+				<div className="flex items-center justify-between border-b border-line pb-4">
+					<h2 className="m-0 text-lg font-semibold">Чаты с ИИ</h2>
 					<button
 						type="button"
 						onClick={onClose}
-						className="p-1 rounded-md text-ink hover:bg-bg-elevated"
+						className="rounded-md p-1 text-ink hover:bg-bg-elevated"
 						aria-label="Закрыть меню"
 					>
 						✕
 					</button>
 				</div>
 
+				<section className="space-y-2.5 border-b border-line py-3">
+					<p className="m-0 text-xs font-medium text-muted">Настройки</p>
+					<div className="grid gap-2">
+						<label className="grid gap-1 text-[0.75rem] text-muted">
+							<span>Модель чата</span>
+							<ModelSelect variant="panel" />
+						</label>
+						<div className="flex items-center justify-between gap-2">
+							<span className="text-[0.75rem] text-muted">Озвучка</span>
+							<VoiceToggle />
+						</div>
+						<label className="grid gap-1 text-[0.75rem] text-muted">
+							<span>Модель озвучки</span>
+							<TtsSelect variant="panel" />
+						</label>
+						<label className="grid gap-1 text-[0.75rem] text-muted">
+							<span>Голос</span>
+							<TtsVoiceSelect variant="panel" />
+						</label>
+					</div>
+				</section>
+
 				<div className="py-3">
 					<button
 						type="button"
-						className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated hover:bg-bg text-ink text-sm font-medium transition-colors"
+						className="flex w-full items-center gap-2 rounded-lg bg-bg-elevated px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-bg"
 						onClick={() => {
 							onNewChat()
 							onClose()
@@ -84,17 +121,17 @@ export function SideMenu({ isOpen, onClose, onChatSelect, onNewChat }: SideMenuP
 								<li key={chat.id}>
 									<button
 										type="button"
-										className="w-full flex flex-col items-start gap-1 px-3 py-2 rounded-lg hover:bg-bg-elevated text-left transition-colors"
+										className="flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-elevated"
 										onClick={() => {
 											onChatSelect(chat.id)
 											onClose()
 										}}
 									>
-										<span className="text-sm font-medium text-ink truncate w-full">
+										<span className="w-full truncate text-sm font-medium text-ink">
 											{chat.title || 'Без названия'}
 										</span>
 										{chat.lastMessage ? (
-											<span className="text-xs text-ink/60 truncate w-full">
+											<span className="w-full truncate text-xs text-ink/60">
 												{chat.lastMessage.length > 60
 													? `${chat.lastMessage.slice(0, 60)}…`
 													: chat.lastMessage}
@@ -111,10 +148,10 @@ export function SideMenu({ isOpen, onClose, onChatSelect, onNewChat }: SideMenuP
 				</div>
 
 				{chats.length > 0 ? (
-					<div className="pt-4 border-t border-line">
+					<div className="border-t border-line pt-4">
 						<button
 							type="button"
-							className="w-full px-3 py-2 rounded-lg text-sm text-danger hover:bg-bg-elevated transition-colors"
+							className="w-full rounded-lg px-3 py-2 text-sm text-danger transition-colors hover:bg-bg-elevated"
 							onClick={() => {
 								chats.forEach((c) => deleteChat(c.id))
 								setChats([])

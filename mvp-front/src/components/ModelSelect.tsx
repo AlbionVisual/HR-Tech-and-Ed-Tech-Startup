@@ -7,7 +7,11 @@ import {
 	type ModelOption,
 } from '../ai/selection'
 
-export function ModelSelect() {
+type Props = {
+	variant?: 'bar' | 'panel'
+}
+
+export function ModelSelect({ variant = 'bar' }: Props) {
 	const [options, setOptions] = useState<ModelOption[]>(() =>
 		listAvailableModels(),
 	)
@@ -32,11 +36,16 @@ export function ModelSelect() {
 		)
 	}
 
+	const selectClass =
+		variant === 'panel'
+			? 'w-full rounded-lg border border-line bg-bg-elevated px-2 py-1.5 font-sans text-[0.8rem] text-ink'
+			: 'w-full max-w-[220px] rounded-xl border border-[#b6b3ad] bg-[#f5f3ef] px-3 py-2 font-sans text-xs sm:text-sm text-ink outline-none hover:bg-[#ede9e2] transition-colors cursor-pointer shadow-sm'
+
 	return (
-		<label className="min-w-0 max-w-[min(220px,42vw)]">
+		<label className={variant === 'panel' ? 'min-w-0 w-full' : 'min-w-0 max-w-[min(220px,42vw)]'}>
 			<span className="sr-only">Модель</span>
 			<select
-				className="w-full max-w-[220px] rounded-xl border border-[#b6b3ad] bg-[#f5f3ef] px-3 py-2 font-sans text-xs sm:text-sm text-ink outline-none hover:bg-[#ede9e2] transition-colors cursor-pointer shadow-sm"
+				className={selectClass}
 				value={value}
 				onChange={(e) => {
 					setSelectedModelId(e.target.value)
@@ -51,4 +60,4 @@ export function ModelSelect() {
 			</select>
 		</label>
 	)
-} 
+}

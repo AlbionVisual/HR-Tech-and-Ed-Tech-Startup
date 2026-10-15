@@ -1,4 +1,4 @@
-import { speakBrowser, stopBrowserTts } from './browserTts'
+import { browserTtsReady, browserTtsSupported, speakBrowser, stopBrowserTts } from './browserTts'
 import { fetchAiaiTtsBlob } from './aiaiTts'
 import { fetchGeminiTtsBlob } from './geminiTts'
 import { playBlob, stopSharedAudio } from './playAudio'
@@ -33,6 +33,11 @@ export async function speakText(
   const onStatus = options?.onStatus
 
   if (selected.provider === 'browser') {
+    if (!browserTtsSupported() || !(await browserTtsReady())) {
+      throw new Error(
+        'Встроенная озвучка недоступна в этом браузере (часто Safari). Выберите Gemini или AIAI TTS.',
+      )
+    }
     onStatus?.('playing')
     await speakBrowser(value)
     onStatus?.('done')
@@ -76,7 +81,7 @@ export async function speakText(
       } catch {
         clearCachedTts(key)
         throw new Error(
-          'AIAI: не удалось воспроизвести аудио (часто битый/не тот формат или обрыв ответа). Попробуйте другую модель или голос.',
+          'AIAI: не удалось воспроизвести полное аудио. Попробуйте модель s1 или другую.',
         )
       }
       onStatus?.('done')

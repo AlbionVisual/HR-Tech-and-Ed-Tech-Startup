@@ -1,7 +1,8 @@
 import {
   config,
+  formatModelOptionLabel,
   getProviderDefaultModel,
-  getProviderModels,
+  getProviderModelDefs,
   type AiProviderId,
 } from '../config'
 import { getByokKey, resolveApiKey } from './byok'
@@ -29,15 +30,15 @@ export function parseModelId(id: string): {
   const provider = id.slice(0, sep) as AiProviderId
   const model = id.slice(sep + 2)
   if (!model) return null
-  if (provider !== 'gemini' && provider !== 'openrouter' && provider !== 'aiai') {
+  if (
+    provider !== 'gemini' &&
+    provider !== 'openrouter' &&
+    provider !== 'aiai' &&
+    provider !== 'mock'
+  ) {
     return null
   }
   return { provider, model }
-}
-
-function shortLabel(model: string) {
-  const bare = model.split('/').pop() ?? model
-  return bare.length > 36 ? `${bare.slice(0, 34)}…` : bare
 }
 
 function providerHasKey(provider: AiProviderId) {
@@ -45,18 +46,18 @@ function providerHasKey(provider: AiProviderId) {
 }
 
 export function listAvailableModels(): ModelOption[] {
-  const providers: AiProviderId[] = ['openrouter', 'gemini', 'aiai']
+  const providers: AiProviderId[] = ['mock', 'openrouter', 'gemini', 'aiai']
   const options: ModelOption[] = []
 
   for (const provider of providers) {
-    if (!providerHasKey(provider)) continue
-    for (const model of getProviderModels(provider)) {
-      if (!model) continue
+    if (provider !== 'mock' && !providerHasKey(provider)) continue
+    for (const model of getProviderModelDefs(provider)) {
+      if (!model.id) continue
       options.push({
-        id: makeModelId(provider, model),
+        id: makeModelId(provider, model.id),
         provider,
-        model,
-        label: `${provider}: ${shortLabel(model)}`,
+        model: model.id,
+        label: formatModelOptionLabel(provider, model.id),
       })
     }
   }

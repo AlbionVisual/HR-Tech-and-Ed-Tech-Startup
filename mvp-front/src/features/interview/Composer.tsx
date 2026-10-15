@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { publicUrl } from '../../config'
 import { useVoice } from '../../speech/VoiceContext'
-import { btn, btnPrimary } from '../../ui/btn'
 
 type Props = {
 	disabled?: boolean
@@ -131,17 +130,38 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 					<>
 						<button
 							type="button"
-							className={btn}
+							className="grid h-9 w-9 place-content-center rounded-full bg-black/5 text-ink transition-colors hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-40"
 							onClick={() => stopAll()}
 							disabled={!ttsBusy && !listening}
-							title="Остановить озвучку и микрофон"
+							title="Замолчи"
+							aria-label="Замолчи"
 						>
-							Замолчи
+							<svg
+								viewBox="0 0 24 24"
+								className="h-5 w-5"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="1.8"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M9 9v3a3 3 0 0 0 6 0v-1" />
+								<path d="M5 10v1a7 7 0 0 0 10.5 6" />
+								<path d="M19 10v1a7 7 0 0 1-.6 2.8" />
+								<path d="M12 19v3" />
+								<path d="M8 22h8" />
+								<path d="M4 4l16 16" />
+							</svg>
 						</button>
 
 						<button
 							type="button"
-							className={listening ? btnPrimary : btn}
+							className={`grid h-9 w-9 place-content-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+								listening
+									? 'bg-accent text-white'
+									: 'bg-black/5 text-ink hover:bg-black/10'
+							}`}
 							onClick={() => void onMicClick()}
 							disabled={disabled || !sttSupported || ttsBusy}
 							title={
@@ -151,18 +171,34 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 										: 'Говорить'
 									: 'Speech recognition недоступен'
 							}
+							aria-label={listening ? 'Остановить микрофон' : 'Микрофон'}
 						>
-							{listening ? 'Слушаю…' : 'Микрофон'}
+							<svg
+								viewBox="0 0 24 24"
+								className="h-5 w-5"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="1.8"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								aria-hidden="true"
+							>
+								<rect x="9" y="3" width="6" height="11" rx="3" />
+								<path d="M5 11a7 7 0 0 0 14 0" />
+								<path d="M12 18v3" />
+								<path d="M8 22h8" />
+							</svg>
 						</button>
 					</>
 				) : null}
 
 				<button
 					type="button"
-					className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${text.trim() && !disabled && !listening
-						? 'text-white shadow-md'
-						: 'text-ink/60'
-						}`}
+					className={`grid h-9 w-9 place-content-center rounded-full transition-all ${
+						text.trim() && !disabled && !listening
+							? 'text-white shadow-md'
+							: 'text-ink/60'
+					}`}
 					disabled={disabled || listening || !text.trim()}
 					onClick={() => submit()}
 					title="Отправить"
@@ -174,10 +210,9 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 								: publicUrl('icons/send-button-inactive.png')
 						}
 						alt="Отправить"
-						className="w-9 h-9 object-contain"
+						className="h-9 w-9 object-contain"
 					/>
 				</button>
-
 			</div>
 		</div>
 	)

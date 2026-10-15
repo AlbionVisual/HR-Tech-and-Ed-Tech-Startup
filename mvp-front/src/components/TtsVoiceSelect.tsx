@@ -13,7 +13,11 @@ function shortVoice(voice: string) {
   return bare.length > 22 ? `${bare.slice(0, 20)}…` : bare
 }
 
-export function TtsVoiceSelect() {
+type Props = {
+  variant?: 'bar' | 'panel'
+}
+
+export function TtsVoiceSelect({ variant = 'bar' }: Props) {
   const { enabled } = useVoice()
   const [voices, setVoices] = useState<string[]>([])
   const [value, setValue] = useState('')
@@ -34,13 +38,33 @@ export function TtsVoiceSelect() {
     }
   }, [])
 
-  if (!enabled || voices.length <= 1) return null
+  if (!enabled) {
+    return (
+      <span className="text-[0.75rem] text-muted">Включите озвучку</span>
+    )
+  }
+
+  if (!voices.length) {
+    return (
+      <span className="text-[0.75rem] text-muted">Голос не выбирается</span>
+    )
+  }
+
+  if (variant === 'bar' && voices.length <= 1) return null
+
+  const selectClass =
+    variant === 'panel'
+      ? 'w-full rounded-lg border border-line bg-bg-elevated px-2 py-1.5 font-sans text-[0.8rem] text-ink'
+      : 'w-full max-w-[160px] rounded-lg border border-line bg-bg-panel px-2 py-1.5 font-sans text-[0.75rem] text-ink'
 
   return (
-    <label className="min-w-0 max-w-[min(160px,32vw)]" title="Голос озвучки">
+    <label
+      className={variant === 'panel' ? 'min-w-0 w-full' : 'min-w-0 max-w-[min(160px,32vw)]'}
+      title="Голос озвучки"
+    >
       <span className="sr-only">TTS голос</span>
       <select
-        className="w-full max-w-[160px] rounded-lg border border-line bg-bg-panel px-2 py-1.5 font-sans text-[0.75rem] text-ink"
+        className={selectClass}
         value={value}
         onChange={(e) => {
           setSelectedTtsVoice(e.target.value)

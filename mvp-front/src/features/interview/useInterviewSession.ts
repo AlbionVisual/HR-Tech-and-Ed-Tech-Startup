@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { chatStream } from '../../ai/client'
+import { resetMockProgress } from '../../ai/providers/mock'
 import { typewriter } from '../../ai/stream/typewriter'
 import type { ChatMessage } from '../../ai/types'
 import { config, type VacancyContext, type VacancyGrade } from '../../config'
@@ -73,6 +74,7 @@ export function useInterviewSession(chatId?: string | null) {
 		setError('')
 		setThought('')
 		setProgress(0)
+		resetMockProgress()
 		setPhase('interviewing')
 		await runAssistantTurn([
 			{ role: 'user', content: config.prompts.firstUserKickoff },

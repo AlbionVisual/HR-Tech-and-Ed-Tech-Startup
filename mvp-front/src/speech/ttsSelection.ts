@@ -2,12 +2,14 @@ import { getByokKey } from '../ai/byok'
 import {
   config,
   defaultVoiceForTts,
+  formatTtsOptionLabel,
   makeTtsId,
   parseTtsId,
   voicesForTts,
   type TtsModelOption,
   type TtsProviderId,
 } from '../config'
+import { browserTtsSupported } from './browserTts'
 
 export const TTS_SETTINGS_EVENT = 'mvp-speech-tts'
 
@@ -15,24 +17,25 @@ export function notifyTtsSettingsChanged() {
   window.dispatchEvent(new Event(TTS_SETTINGS_EVENT))
 }
 
-function shortLabel(model: string) {
-  const bare = model.split('/').pop() ?? model
-  return bare.length > 28 ? `${bare.slice(0, 26)}…` : bare
-}
-
 export function listAvailableTtsModels(): TtsModelOption[] {
-  const options: TtsModelOption[] = config.speech.browser.models.map((m) => ({
-    provider: 'browser' as const,
-    model: m.model,
-    label: 'Браузер (системный)',
-  }))
+  const options: TtsModelOption[] = []
+
+  if (browserTtsSupported()) {
+    for (const m of config.speech.browser.models) {
+      options.push({
+        provider: 'browser',
+        model: m.model,
+        label: formatTtsOptionLabel('browser', m.model),
+      })
+    }
+  }
 
   if (getByokKey('gemini')) {
     for (const m of config.speech.gemini.models) {
       options.push({
         provider: 'gemini',
         model: m.model,
-        label: `gemini: ${shortLabel(m.model)}`,
+        label: formatTtsOptionLabel('gemini', m.model),
       })
     }
   }
@@ -42,7 +45,7 @@ export function listAvailableTtsModels(): TtsModelOption[] {
       options.push({
         provider: 'aiai',
         model: m.model,
-        label: `aiai: ${shortLabel(m.model)}`,
+        label: formatTtsOptionLabel('aiai', m.model),
       })
     }
   }
@@ -115,6 +118,7 @@ export function resolveTtsSelection(): {
       (o) => saved && o.provider === saved.provider && o.model === saved.model,
     ) ||
     (saved ? options.find((o) => o.provider === saved.provider) : null) ||
+    options.find((o) => o.provider !== 'browser') ||
     options.find((o) => o.provider === 'browser') ||
     options[0] ||
     null

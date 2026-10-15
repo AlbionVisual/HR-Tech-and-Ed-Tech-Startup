@@ -38,7 +38,7 @@ npm install
 npm run dev
 ```
 
-Dev-сервер — **HTTPS** (self-signed через `@vitejs/plugin-basic-ssl`), чтобы микрофон работал и по LAN-IP с телефона. В браузере один раз примите предупреждение о сертификате.
+Dev-сервер — **HTTPS** (self-signed через `@vitejs/plugin-basic-ssl`), порт **5273** (на Windows диапазон 5141–5240 часто зарезервирован Hyper-V → `EACCES` на `:5173`). `host: true` — доступ с телефона в той же Wi‑Fi; примите предупреждение о сертификате.
 
 Обычный билд → `mvp-front/dist`:
 
