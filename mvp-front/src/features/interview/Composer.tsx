@@ -6,6 +6,7 @@ type Props = {
 	disabled?: boolean
 	onSend: (text: string) => void
 	textPlaceholder: string
+	value?: string
 }
 
 function appendChunk(prev: string, chunk: string) {
@@ -15,7 +16,7 @@ function appendChunk(prev: string, chunk: string) {
 	return /\s$/.test(prev) ? `${prev}${next}` : `${prev} ${next}`
 }
 
-export function Composer({ disabled, onSend, textPlaceholder }: Props) {
+export function Composer({ disabled, onSend, textPlaceholder, value }: Props) {
 	const [text, setText] = useState('')
 	const [expanded, setExpanded] = useState(false)
 	const [micError, setMicError] = useState('')
@@ -34,6 +35,12 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 		consumeHeardInsert,
 	} = useVoice()
 	const ttsBusy = preparing || speaking
+
+	useEffect(() => {
+		if (value !== undefined) {
+			setText(value)
+		}
+	}, [value])
 
 	useEffect(() => {
 		if (!heardInsert) return
@@ -157,11 +164,10 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 
 						<button
 							type="button"
-							className={`grid h-9 w-9 place-content-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-								listening
-									? 'bg-accent text-white'
-									: 'bg-black/5 text-ink hover:bg-black/10'
-							}`}
+							className={`grid h-9 w-9 place-content-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${listening
+								? 'bg-accent text-white'
+								: 'bg-black/5 text-ink hover:bg-black/10'
+								}`}
 							onClick={() => void onMicClick()}
 							disabled={disabled || !sttSupported || ttsBusy}
 							title={
@@ -194,11 +200,10 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 
 				<button
 					type="button"
-					className={`grid h-9 w-9 place-content-center rounded-full transition-all ${
-						text.trim() && !disabled && !listening
-							? 'text-white shadow-md'
-							: 'text-ink/60'
-					}`}
+					className={`grid h-9 w-9 place-content-center rounded-full transition-all ${text.trim() && !disabled && !listening
+						? 'text-white shadow-md'
+						: 'text-ink/60'
+						}`}
 					disabled={disabled || listening || !text.trim()}
 					onClick={() => submit()}
 					title="Отправить"

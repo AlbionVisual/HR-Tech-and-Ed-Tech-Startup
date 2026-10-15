@@ -1,15 +1,11 @@
 import { ChatView } from '../features/resume/ChatView'
-import { InterviewProgress } from '../features/interview/InterviewProgress'
 import { useResumeSession } from '../features/resume/useResumeSession'
 
 export function ResumePage() {
 	const session = useResumeSession()
-	const inChat =
-		session.phase === 'check_resume' || session.phase === 'awaiting_next'
 
 	return (
 		<div className="flex h-full min-h-0 flex-col">
-			{inChat ? <InterviewProgress value={session.progress} /> : null}
 
 				<ChatView
 					messages={session.messages}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChatMessage } from '../../ai/types'
 import { useVoice } from '../../speech/VoiceContext'
 import { ChatMessageList } from './ChatMessageList'
@@ -6,6 +6,7 @@ import { Composer } from '../interview/Composer'
 // import { FeedbackActions } from '../interview/FeedbackActions'
 import { ResumeStartGrid } from './ResumeStartGrid'
 import type { ResumeMode, ResumePhase } from './useResumeSession'
+import { RESUME_PRESETS } from './presets'
 
 type Props = {
 	messages: ChatMessage[]
@@ -37,6 +38,15 @@ export function ChatView({
 	onStartCheck,
 	onSend,
 }: Props) {
+
+	const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
+	const [presetText, setPresetText] = useState<string>('')
+
+	const handleSelectPreset = (id: string, text: string) => {
+		setSelectedPresetId(id)
+		setPresetText(text)
+	}
+
 	const listRef = useRef<HTMLDivElement>(null)
 	const stickRef = useRef(true)
 	const isIdle = phase === 'idle'
@@ -88,11 +98,45 @@ export function ChatView({
 			</div>
 
 			{phase === 'awaiting_next' ? 1 : (
-				<Composer
-					disabled={busy}
-					onSend={handleSubmit}
-					textPlaceholder = {'Отправьте резюме'}
-				/>
+
+
+				<div className="flex flex-col gap-2.5 p-4 pt-0">
+					{/* Блок готовых резюме — показывается только на стартовом экране (isIdle) */}
+					{isIdle && (
+						<div className="flex flex-col gap-2">
+							<span className="text-sm font-normal text-gray-500 text-left">
+								Используйте готовые резюме
+							</span>
+
+							{/* Горизонтальный скролл чипсов */}
+							<div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+								{RESUME_PRESETS.map((preset) => {
+									const isSelected = selectedPresetId === preset.id
+
+									return (
+										<button
+											key={preset.id}
+											type="button"
+											onClick={() => handleSelectPreset(preset.id, preset.text)}
+											className={`px-3 py-2  border border-[#b6b3ad]  rounded-2xl text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${isSelected
+												? 'bg-[#98D2B9] text-gray-900' 
+												: 'bg-[#f5f3ef] text-gray-800 hover:bg-[#ede9e2]'
+												}`}
+										>
+											{preset.label}
+										</button>
+									)
+								})}
+							</div>
+						</div>
+					)}
+					<Composer
+						disabled={busy}
+						value={presetText}
+						onSend={handleSubmit}
+						textPlaceholder={'Отправьте резюме'}
+					/>
+				</div>
 			)}
 		</div>
 	)
