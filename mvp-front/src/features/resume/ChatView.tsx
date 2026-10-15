@@ -94,16 +94,14 @@ export function ChatView({
 
       {phase === "awaiting_next" ?
         1
-      : <div className="flex flex-col gap-2.5 p-4 pt-0">
-          {/* Блок готовых резюме — показывается только на стартовом экране (isIdle) */}
+      : <div className="flex flex-col gap-1 p-2 pt-0">
           {isIdle && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-normal text-gray-500 text-left">
                 Попробуйте, используя готовые резюме
               </span>
 
-              {/* Горизонтальный скролл чипсов */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                 {RESUME_PRESETS.map((preset) => {
                   const isSelected = selectedPresetId === preset.id;
 

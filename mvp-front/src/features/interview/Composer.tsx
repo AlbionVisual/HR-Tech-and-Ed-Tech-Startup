@@ -75,7 +75,7 @@ export function Composer({ disabled, onSend, textPlaceholder, value }: Props) {
 		<div
 			className={
 				expanded
-					? 'relative flex flex-col justify-between border-t border-line bg-bg-elevated p-5 m-2 rounded-2xl shadow-xl h-[40vh] max-h-full'
+					? 'relative flex flex-col justify-between border-t border-line bg-bg-elevated p-5 m-2 rounded-2xl shadow-xl h-[30vh] max-h-full'
 					: 'relative flex flex-col justify-between border-t border-line bg-bg-elevated p-5 m-2 rounded-2xl shadow-xl'
 			}    >
 
