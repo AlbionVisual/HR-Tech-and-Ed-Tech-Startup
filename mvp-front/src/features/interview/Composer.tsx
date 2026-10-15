@@ -36,7 +36,6 @@ export function Composer({ disabled, onSend, textPlaceholder }: Props) {
 	} = useVoice()
 	const ttsBusy = preparing || speaking
 
-	console.log(textPlaceholder)
 	useEffect(() => {
 		if (!heardInsert) return
 		setText((prev) => appendChunk(prev, heardInsert.text))
