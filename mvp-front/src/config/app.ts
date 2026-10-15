@@ -5,7 +5,7 @@ export const appConfig = {
     { id: 'tests' as const, title: 'Тесты' },
     { id: 'resume' as const, title: 'Резюме' },
     { id: 'interview' as const, title: 'Интервью' },
-    { id: 'profile' as const, title: 'Профиль' },
+    // { id: 'profile' as const, title: 'Профиль' },
   ],
   defaultPage: 'interview' as PageId,
   interview: {

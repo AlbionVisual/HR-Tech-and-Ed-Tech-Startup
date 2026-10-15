@@ -56,9 +56,11 @@ const VOICE_EVENT = 'mvp-speech-settings'
 
 function readEnabled() {
   try {
-    return localStorage.getItem(config.speech.voiceModeKey) === '1'
+    const v = localStorage.getItem(config.speech.voiceModeKey)
+    if (v === null) return true
+    return v === '1'
   } catch {
-    return false
+    return true
   }
 }
 
