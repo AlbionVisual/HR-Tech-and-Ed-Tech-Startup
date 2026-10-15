@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { TESTS_DATA } from "../features/tests/testsData";
-// import { btn, btnPrimary } from '../ui/btn'
+import { TESTS_DATA, type Question } from "../features/tests/testsData";
 
 type Screen = "start" | "quiz" | "result" | "review";
 
@@ -10,6 +9,7 @@ export function TestsPage() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("Python");
   const [screen, setScreen] = useState<Screen>("start");
 
+  const [currentTestQuestions, setCurrentTestQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isChecked, setIsChecked] = useState(false);
@@ -17,10 +17,20 @@ export function TestsPage() {
 
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
 
-  const questions = TESTS_DATA[selectedLanguage] || TESTS_DATA["Python"];
-  const currentQuestion = questions[currentIndex];
+  const currentQuestion = currentTestQuestions[currentIndex];
+
+  const [completedTestsCount, setCompletedTestsCount] = useState<number>(() => {
+    const saved = localStorage.getItem("completed_tests_count");
+    return saved ? Number(saved) : 0;
+});
 
   const handleStart = () => {
+    const languageTests = TESTS_DATA[selectedLanguage] || TESTS_DATA["Python"];
+
+    const randomTestIndex = Math.floor(Math.random() * languageTests.length);
+    const chosenQuestions = languageTests[randomTestIndex];
+
+    setCurrentTestQuestions(chosenQuestions);
     setCurrentIndex(0);
     setSelectedOption(null);
     setIsChecked(false);
@@ -30,7 +40,7 @@ export function TestsPage() {
   };
 
   const handleCheck = () => {
-    if (selectedOption === null) return;
+    if (selectedOption === null || !currentQuestion) return;
     setIsChecked(true);
 
     const isCorrect = selectedOption === currentQuestion.correctAnswer;
@@ -45,8 +55,23 @@ export function TestsPage() {
     }
   };
 
-  const handleNext = () => {
-    if (lives === 0 || currentIndex + 1 >= questions.length) {
+const handleNext = () => {
+    if (lives === 0) {
+      setIsChecked(false);
+      setSelectedOption(null);
+      setScreen("result");
+      return;
+    }
+
+    if (currentIndex + 1 >= currentTestQuestions.length) {
+      setCompletedTestsCount((prev) => {
+        const nextCount = prev + 1;
+        localStorage.setItem("completed_tests_count", nextCount.toString());
+        return nextCount;
+      });
+
+      setIsChecked(false);
+      setSelectedOption(null);
       setScreen("result");
       return;
     }
@@ -58,17 +83,18 @@ export function TestsPage() {
 
   const answeredQuestionIds = Object.keys(userAnswers).map(Number);
   const correctCount = answeredQuestionIds.reduce((acc, qId) => {
-    const q = questions.find((item) => item.id === qId);
+    const q = currentTestQuestions.find((item) => item.id === qId);
     return q && userAnswers[qId] === q.correctAnswer ? acc + 1 : acc;
   }, 0);
 
-  const wrongQuestions = questions.filter(
+  const wrongQuestions = currentTestQuestions.filter(
     (q) =>
       userAnswers[q.id] !== undefined && userAnswers[q.id] !== q.correctAnswer,
   );
 
   const isGameOver = lives === 0;
-  const isLastQuestion = currentIndex + 1 === questions.length;
+  const isLastQuestion = currentIndex + 1 === currentTestQuestions.length;
+
 
   return (
     <div className="mt-10 mx-auto w-full max-w-xl grid gap-4 p-4">
@@ -78,21 +104,26 @@ export function TestsPage() {
             <span className="text-xs opacity-80 uppercase tracking-wider">
               Development · Junior
             </span>
-            <h2 className="m-0 text-2xl font-bold">Тест дня</h2>
+            <h2 className="m-0 text-2xl font-bold">Случайный тест дня</h2>
             <p className="m-0 text-sm opacity-90">
-              {questions.length} вопросов · около 3 минут
+              10 вопросов · около 3 минут
             </p>
           </div>
 
-          <div className="grid gap-1.5">
-            <div className="flex justify-between text-xs opacity-90">
-              <span>Цель на день</span>
-              <span>2/10</span>
+            <div className="grid gap-1.5">
+              <div className="flex justify-between text-xs opacity-90 font-medium">
+                <span>Цель на день</span>
+                <span>{Math.min(completedTestsCount, 5)}/5</span>
+              </div>
+              <div className="h-2 w-full bg-black/20 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-white rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${Math.min((completedTestsCount / 5) * 100, 100)}%`,
+                  }}
+                />
+              </div>
             </div>
-            <div className="h-2 w-full bg-black/20 rounded-full overflow-hidden">
-              <div className="h-full bg-white rounded-full w-[20%]" />
-            </div>
-          </div>
 
           <section className="grid gap-3 pt-2">
             <span className="text-sm font-semibold opacity-90">
@@ -121,10 +152,11 @@ export function TestsPage() {
                       </span>
                       <div className="text-left">
                         <div className="text-base font-bold">{lang}</div>
-                        <div
-                          className={`text-xs ${active ? "text-muted" : "opacity-70"}`}>
-                          {active ? "" : "Новый"}
-                        </div>
+                        {!active && (
+                          <div className="text-xs opacity-70">
+                            Новый
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div
@@ -154,9 +186,8 @@ export function TestsPage() {
         </div>
       )}
 
-      {screen === "quiz" && (
+      {screen === "quiz" && currentQuestion && (
         <div className="relative flex flex-col justify-between min-h-[580px] bg-[#f5f3ef] p-6 rounded-3xl text-ink shadow-md overflow-hidden">
-          {/* Верхняя шапка с прогрессом и жизнями */}
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
               <button
@@ -170,7 +201,7 @@ export function TestsPage() {
                 <div
                   className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                   style={{
-                    width: `${((currentIndex + 1) / questions.length) * 100}%`,
+                    width: `${((currentIndex + 1) / currentTestQuestions.length) * 100}%`,
                   }}
                 />
               </div>
@@ -181,15 +212,13 @@ export function TestsPage() {
             </div>
 
             <div className="text-xs text-muted mb-1 font-medium">
-              Вопрос {currentIndex + 1} из {questions.length}
+              Вопрос {currentIndex + 1} из {currentTestQuestions.length}
             </div>
 
-            {/* Текст вопроса */}
             <h3 className="m-0 text-xl font-bold mb-6 text-ink">
               {currentQuestion.question}
             </h3>
 
-            {/* Варианты ответов */}
             <div className="grid gap-3">
               {currentQuestion.options.map((opt, idx) => {
                 const isSelected = selectedOption === idx;
@@ -300,16 +329,15 @@ export function TestsPage() {
         <div className="relative flex flex-col justify-between min-h-[580px] bg-[#f5f3ef] p-6 rounded-3xl text-ink shadow-md text-center">
           <div className="pt-6">
             <span className="text-xs uppercase tracking-wider text-muted font-medium">
-              Python · Junior
+              {selectedLanguage} · Junior
             </span>
 
-            {/* Крупный результат */}
             <div className="text-6xl font-bold text-emerald-600 my-4 tracking-tight">
-              {correctCount}/{questions.length}
+              {correctCount}/{currentTestQuestions.length}
             </div>
 
             <h3 className="m-0 text-xl font-bold text-ink mb-2">
-              {correctCount >= questions.length * 0.7 ?
+              {correctCount >= currentTestQuestions.length * 0.7 ?
                 "Уверенный результат. Навыки соответствуют ожиданиям."
               : "Требуется дополнительная подготовка по ряду тем."}
             </h3>
@@ -381,13 +409,12 @@ export function TestsPage() {
             </div>
           </div>
 
-          {/* Нижняя кнопка */}
           <div className="pt-6">
             <button
               type="button"
               className="w-full py-4 rounded-2xl bg-transparent hover:bg-black/5 text-ink font-bold text-center transition-all cursor-pointer border-2 border-ink"
               onClick={handleStart}>
-              Пройти тест ещё раз
+              Пройти другой тест
             </button>
           </div>
         </div>
