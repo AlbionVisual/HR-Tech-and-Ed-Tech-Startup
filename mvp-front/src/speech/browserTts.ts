@@ -1,4 +1,5 @@
 import { config } from '../config'
+import { ttsDebug } from './ttsDebug'
 
 let current: SpeechSynthesisUtterance | null = null
 
@@ -63,13 +64,41 @@ export async function speakBrowser(text: string): Promise<void> {
     const utter = new SpeechSynthesisUtterance(text)
     utter.lang = config.speech.lang
     current = utter
+    const voices = window.speechSynthesis.getVoices()
+    const startedAt = performance.now()
+    ttsDebug('browser.speak.begin', {
+      textLen: text.length,
+      lang: utter.lang,
+      voicesCount: voices.length,
+      voiceNames: voices.slice(0, 8).map((v) => `${v.name}|${v.lang}`),
+      paused: window.speechSynthesis.paused,
+      speaking: window.speechSynthesis.speaking,
+      pending: window.speechSynthesis.pending,
+    })
+
+    utter.onstart = () => {
+      ttsDebug('browser.speak.start', {
+        elapsedMs: Math.round(performance.now() - startedAt),
+      })
+    }
     utter.onend = () => {
+      ttsDebug('browser.speak.end', {
+        elapsedMs: Math.round(performance.now() - startedAt),
+      })
       if (current === utter) current = null
       resolve()
     }
     utter.onerror = (ev) => {
-      if (current === utter) current = null
       const code = ev.error || 'error'
+      ttsDebug(
+        'browser.speak.error',
+        {
+          code,
+          elapsedMs: Math.round(performance.now() - startedAt),
+        },
+        code === 'interrupted' || code === 'canceled' ? 'warn' : 'error',
+      )
+      if (current === utter) current = null
       if (code === 'interrupted' || code === 'canceled') {
         resolve()
         return

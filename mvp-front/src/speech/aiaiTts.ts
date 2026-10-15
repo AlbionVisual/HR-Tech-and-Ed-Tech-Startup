@@ -1,5 +1,11 @@
 import { config, defaultVoiceForTts } from '../config'
 import { getByokKey } from '../ai/byok'
+import {
+  estimateMp3Seconds,
+  estimatePcm16Seconds,
+  sniffHeadHex,
+  ttsDebug,
+} from './ttsDebug'
 
 function readErrorMessage(body: string, status: number) {
   try {
@@ -96,7 +102,7 @@ async function requestSpeech(
   model: string,
   text: string,
   voice: string,
-  format: 'mp3' | 'wav' | null,
+  format: 'mp3' | 'wav' | 'pcm' | null,
 ): Promise<Response> {
   const body: Record<string, string> = {
     model,
@@ -126,26 +132,54 @@ export async function fetchAiaiTtsBlob(
     throw new Error('Для AIAI TTS нужен ключ AIAI.BY в Профиле')
   }
 
-  // wav лучше декодируется целиком; mp3 — запасной; null — как в доке AIAI
-  const formats: Array<'mp3' | 'wav' | null> = ['mp3', null, 'wav']
+  // mp3 по умолчанию у OpenAI-совместимых; wav/pcm ближе к «gemini-like»
+  const formats: Array<'mp3' | 'wav' | 'pcm' | null> = ['mp3', null, 'wav', 'pcm']
   let lastStatus = 0
   let lastBody = ''
 
+  ttsDebug('aiai.fetch.begin', {
+    model,
+    voice,
+    textLen: text.length,
+    textPreview: text.slice(0, 80),
+  })
+
   for (let attempt = 0; attempt < 4; attempt++) {
     const format = formats[Math.min(attempt, formats.length - 1)]
+    ttsDebug('aiai.fetch.attempt', { attempt, response_format: format })
     const res = await requestSpeech(apiKey, model, text, voice, format)
 
     if (res.ok) {
       const buf = await res.arrayBuffer()
+      const headerCt = res.headers.get('content-type')
+      const sniffed = sniffAudioMime(buf)
+      ttsDebug('aiai.fetch.ok', {
+        attempt,
+        response_format: format,
+        status: res.status,
+        headerContentType: headerCt,
+        sniffedMime: sniffed,
+        bytes: buf.byteLength,
+        headHex: sniffHeadHex(buf),
+        estMp3Sec128k: Number(estimateMp3Seconds(buf.byteLength).toFixed(3)),
+        estPcm16Sec24k: Number(estimatePcm16Seconds(buf.byteLength).toFixed(3)),
+      })
+
       if (buf.byteLength < 64) {
         throw new Error('AIAI TTS: пустой или слишком короткий аудиоответ')
       }
 
-      const mime = normalizeMime(res.headers.get('content-type'), buf)
-      if (!sniffAudioMime(buf)) {
+      const mime = normalizeMime(headerCt, buf)
+      if (!sniffed) {
         const head = new TextDecoder().decode(buf.slice(0, 80)).trimStart()
         if (head.startsWith('{')) {
           throw new Error(readErrorMessage(head, res.status))
+        }
+        if (format === 'pcm' || headerCt?.includes('pcm')) {
+          ttsDebug('aiai.fetch.rawPcmSuspect', {
+            bytes: buf.byteLength,
+            headerContentType: headerCt,
+          }, 'warn')
         }
       }
 
@@ -154,6 +188,16 @@ export async function fetchAiaiTtsBlob(
 
     lastStatus = res.status
     lastBody = await res.text().catch(() => '')
+    ttsDebug(
+      'aiai.fetch.fail',
+      {
+        attempt,
+        response_format: format,
+        status: lastStatus,
+        bodyPreview: lastBody.slice(0, 160),
+      },
+      'warn',
+    )
 
     if (res.status === 400) continue
 

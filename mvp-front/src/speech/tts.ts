@@ -9,6 +9,7 @@ import {
   ttsCacheKey,
 } from './ttsCache'
 import { resolveTtsSelection } from './ttsSelection'
+import { ttsDebug } from './ttsDebug'
 
 export type SpeakStatus = 'loading' | 'playing' | 'done'
 
@@ -32,8 +33,17 @@ export async function speakText(
   const selected = resolveTtsSelection()
   const onStatus = options?.onStatus
 
+  ttsDebug('speak.begin', {
+    provider: selected.provider,
+    model: selected.model,
+    voice: selected.voice,
+    textLen: value.length,
+    textPreview: value.slice(0, 100),
+  })
+
   if (selected.provider === 'browser') {
     if (!browserTtsSupported() || !(await browserTtsReady())) {
+      ttsDebug('speak.browser.unavailable', {}, 'error')
       throw new Error(
         'Встроенная озвучка недоступна в этом браузере (часто Safari). Выберите Gemini или AIAI TTS.',
       )
@@ -41,6 +51,7 @@ export async function speakText(
     onStatus?.('playing')
     await speakBrowser(value)
     onStatus?.('done')
+    ttsDebug('speak.done', { provider: 'browser' })
     return
   }
 
@@ -54,6 +65,8 @@ export async function speakText(
     })
 
   let blob = getCachedTts(key)
+  const cacheHit = Boolean(blob)
+  ttsDebug('speak.cache', { hit: cacheHit, keyPreview: key.slice(0, 120) })
   if (!blob) {
     onStatus?.('loading')
     if (selected.provider === 'gemini') {
@@ -64,12 +77,25 @@ export async function speakText(
       throw new Error(`Неизвестный TTS провайдер: ${selected.provider}`)
     }
     setCachedTts(key, blob)
+    ttsDebug('speak.fetched', {
+      provider: selected.provider,
+      bytes: blob.size,
+      type: blob.type,
+    })
   }
 
   onStatus?.('playing')
   try {
     await playBlob(blob)
   } catch (e) {
+    ttsDebug(
+      'speak.playFailed',
+      {
+        provider: selected.provider,
+        error: e instanceof Error ? e.message : String(e),
+      },
+      'error',
+    )
     clearCachedTts(key)
     if (selected.provider === 'aiai') {
       onStatus?.('loading')
@@ -85,9 +111,11 @@ export async function speakText(
         )
       }
       onStatus?.('done')
+      ttsDebug('speak.done', { provider: 'aiai', retried: true })
       return
     }
     throw e
   }
   onStatus?.('done')
+  ttsDebug('speak.done', { provider: selected.provider, cacheHit })
 }

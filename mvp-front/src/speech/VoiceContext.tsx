@@ -20,6 +20,7 @@ import {
 import { browserTtsReady, browserTtsSupported } from './browserTts'
 import { resolveTtsSelection, TTS_SETTINGS_EVENT } from './ttsSelection'
 import { speakText, stopTts, type SpeakStatus } from './tts'
+import { ttsDebug } from './ttsDebug'
 
 type SpeakOptions = {
   messageId?: string
@@ -213,6 +214,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        ttsDebug('voice.speak', {
+          messageId: options?.messageId ?? null,
+          listenAfter: Boolean(options?.listenAfter),
+          textLen: text.length,
+        })
         await speakText(text, { onStatus })
         if (runId !== runIdRef.current) return
         setPreparing(false)
@@ -222,13 +228,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         if (!options?.listenAfter || !enabled) return
         if (!browserSttSupported()) return
 
+        ttsDebug('voice.listenAfter.begin', { messageId: options?.messageId ?? null })
         setListening(true)
         try {
           const heard = await listenBrowserOnce()
           if (runId !== runIdRef.current) return
+          ttsDebug('voice.listenAfter.heard', { chars: heard.length })
           pushHeard(heard)
         } catch (e) {
           if (runId !== runIdRef.current) return
+          ttsDebug(
+            'voice.listenAfter.error',
+            { error: e instanceof Error ? e.message : String(e) },
+            'error',
+          )
           setVoiceError(e instanceof Error ? e.message : 'Ошибка микрофона')
         } finally {
           if (runId === runIdRef.current) setListening(false)
@@ -239,6 +252,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         setSpeaking(false)
         setPlayingMessageId(null)
         setListening(false)
+        ttsDebug(
+          'voice.speak.error',
+          { error: e instanceof Error ? e.message : String(e) },
+          'error',
+        )
         setVoiceError(e instanceof Error ? e.message : 'Ошибка озвучки')
       }
     },

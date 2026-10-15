@@ -1,5 +1,6 @@
 import { config, defaultVoiceForTts } from '../config'
 import { getByokKey } from '../ai/byok'
+import { estimatePcm16Seconds, sniffHeadHex, ttsDebug } from './ttsDebug'
 
 function pcmToWav(pcm: Uint8Array, sampleRate = 24000) {
   const buffer = new ArrayBuffer(44 + pcm.length)
@@ -69,8 +70,25 @@ export async function fetchGeminiTtsBlob(
 
   const raw = Uint8Array.from(atob(inline.data), (c) => c.charCodeAt(0))
   const mime = inline.mimeType || ''
+  ttsDebug('gemini.fetch.ok', {
+    model,
+    voice,
+    textLen: text.length,
+    inlineMime: mime,
+    rawBytes: raw.byteLength,
+    headHex: sniffHeadHex(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength)),
+    estPcm16Sec24k: Number(estimatePcm16Seconds(raw.byteLength).toFixed(3)),
+  })
+
   if (mime.includes('wav') || mime.includes('mpeg') || mime.includes('mp3')) {
+    ttsDebug('gemini.fetch.blob', { path: 'as-is', type: mime || 'audio/wav' })
     return new Blob([raw], { type: mime || 'audio/wav' })
   }
-  return new Blob([pcmToWav(raw)], { type: 'audio/wav' })
+  const wav = pcmToWav(raw)
+  ttsDebug('gemini.fetch.blob', {
+    path: 'pcmToWav',
+    type: 'audio/wav',
+    wavBytes: wav.byteLength,
+  })
+  return new Blob([wav], { type: 'audio/wav' })
 }
