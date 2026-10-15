@@ -98,6 +98,8 @@ export function buildSetupLink(input: {
   useHash?: boolean
 }) {
   const origin = input.origin || window.location.origin
+  // GitHub Pages: BASE_URL = /HR-Tech-and-Ed-Tech-Startup/
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
   const params = new URLSearchParams()
   if (input.gemini) params.set('gemini', input.gemini)
   if (input.openrouter) params.set('openrouter', input.openrouter)
@@ -105,6 +107,6 @@ export function buildSetupLink(input: {
   if (input.model) params.set('model', input.model)
   if (input.provider) params.set('provider', input.provider)
   const q = params.toString()
-  if (input.useHash) return `${origin}/#${q}`
-  return `${origin}/?${q}`
+  if (input.useHash) return `${origin}${base}#${q}`
+  return `${origin}${base}?${q}`
 }
