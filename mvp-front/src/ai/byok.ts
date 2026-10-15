@@ -37,5 +37,6 @@ export function clearByokKey(provider: AiProviderId) {
 }
 
 export function resolveApiKey(provider: AiProviderId) {
+  if (provider === 'mock') return 'mock'
   return getByokKey(provider)
 }

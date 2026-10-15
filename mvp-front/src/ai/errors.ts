@@ -11,6 +11,14 @@ export function humanizeAiError(status: number, body: string) {
     return 'Лимит запросов исчерпан или слишком частые вызовы. Подождите и попробуйте снова.'
   }
 
+  if (
+    lower.includes('user location') ||
+    lower.includes('location is not supported') ||
+    lower.includes('failed_precondition')
+  ) {
+    return 'Похоже, Gemini из этой сети недоступен. Попробуйте «телепортироваться в другую страну» (VPN) и обновить страницу.'
+  }
+
   if (status === 401 || status === 403) {
     return 'Ключ отклонён или нет доступа к модели. Проверьте API-ключ в Профиле.'
   }

@@ -10,7 +10,11 @@ import {
 } from '../speech/ttsSelection'
 import type { TtsModelOption } from '../config'
 
-export function TtsSelect() {
+type Props = {
+  variant?: 'bar' | 'panel'
+}
+
+export function TtsSelect({ variant = 'bar' }: Props) {
   const { enabled } = useVoice()
   const [options, setOptions] = useState<TtsModelOption[]>(() =>
     listAvailableTtsModels(),
@@ -42,13 +46,29 @@ export function TtsSelect() {
     }
   }, [])
 
-  if (!enabled) return null
+  if (!enabled) {
+    return (
+      <span className="text-[0.75rem] text-muted">Включите озвучку</span>
+    )
+  }
+
+  if (!options.length) {
+    return <span className="text-[0.75rem] text-muted">Нет TTS-моделей</span>
+  }
+
+  const selectClass =
+    variant === 'panel'
+      ? 'w-full rounded-lg border border-line bg-bg-elevated px-2 py-1.5 font-sans text-[0.8rem] text-ink'
+      : 'w-full max-w-[180px] rounded-lg border border-line bg-bg-panel px-2 py-1.5 font-sans text-[0.75rem] text-ink'
 
   return (
-    <label className="min-w-0 max-w-[min(180px,36vw)]" title="Модель озвучки">
+    <label
+      className={variant === 'panel' ? 'min-w-0 w-full' : 'min-w-0 max-w-[min(180px,36vw)]'}
+      title="Модель озвучки"
+    >
       <span className="sr-only">TTS модель</span>
       <select
-        className="w-full max-w-[180px] rounded-lg border border-line bg-bg-panel px-2 py-1.5 font-sans text-[0.75rem] text-ink"
+        className={selectClass}
         value={value}
         onChange={(e) => {
           setSelectedTtsId(e.target.value)

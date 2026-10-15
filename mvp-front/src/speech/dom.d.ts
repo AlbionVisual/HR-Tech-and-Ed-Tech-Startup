@@ -42,4 +42,5 @@ declare var webkitSpeechRecognition: {
 interface Window {
   SpeechRecognition?: typeof SpeechRecognition
   webkitSpeechRecognition?: typeof webkitSpeechRecognition
+  webkitAudioContext?: typeof AudioContext
 }

@@ -8,12 +8,17 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { getByokKey } from '../ai/byok'
+import { AI_SETTINGS_EVENT } from '../ai/selection'
+import { geminiProbeMessage, probeGeminiAccess } from '../ai/probeGemini'
 import { config } from '../config'
 import {
   browserSttSupported,
   listenBrowserOnce,
   stopBrowserStt,
 } from './browserStt'
+import { browserTtsReady, browserTtsSupported } from './browserTts'
+import { resolveTtsSelection, TTS_SETTINGS_EVENT } from './ttsSelection'
 import { speakText, stopTts, type SpeakStatus } from './tts'
 
 type SpeakOptions = {
@@ -67,14 +72,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const runIdRef = useRef(0)
   const heardIdRef = useRef(0)
 
-  useEffect(() => {
-    function sync() {
-      setEnabledState(readEnabled())
-    }
-    window.addEventListener(VOICE_EVENT, sync)
-    return () => window.removeEventListener(VOICE_EVENT, sync)
-  }, [])
-
   const clearVoiceError = useCallback(() => setVoiceError(''), [])
 
   const pushHeard = useCallback((text: string) => {
@@ -87,6 +84,56 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const consumeHeardInsert = useCallback((id: number) => {
     setHeardInsert((prev) => (prev?.id === id ? null : prev))
   }, [])
+
+  const runAccessChecks = useCallback(async () => {
+    if (!enabled) return
+
+    const tts = resolveTtsSelection()
+    if (tts.provider === 'browser') {
+      const ok = await browserTtsReady()
+      if (!ok) {
+        setVoiceError(
+          'Встроенная озвучка недоступна в этом браузере (часто Safari). Выберите Gemini или AIAI TTS.',
+        )
+        return
+      }
+    }
+
+    if (tts.provider === 'gemini' && getByokKey('gemini')) {
+      const probe = await probeGeminiAccess(true)
+      if (!probe.ok && probe.reason !== 'no_key') {
+        setVoiceError(geminiProbeMessage(probe))
+      }
+    }
+  }, [enabled])
+
+  useEffect(() => {
+    function sync() {
+      setEnabledState(readEnabled())
+    }
+    window.addEventListener(VOICE_EVENT, sync)
+    return () => window.removeEventListener(VOICE_EVENT, sync)
+  }, [])
+
+  useEffect(() => {
+    void runAccessChecks()
+
+    function onOnline() {
+      void runAccessChecks()
+    }
+    function onSettings() {
+      void runAccessChecks()
+    }
+
+    window.addEventListener('online', onOnline)
+    window.addEventListener(TTS_SETTINGS_EVENT, onSettings)
+    window.addEventListener(AI_SETTINGS_EVENT, onSettings)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener(TTS_SETTINGS_EVENT, onSettings)
+      window.removeEventListener(AI_SETTINGS_EVENT, onSettings)
+    }
+  }, [enabled, runAccessChecks])
 
   const setEnabled = useCallback((value: boolean) => {
     localStorage.setItem(config.speech.voiceModeKey, value ? '1' : '0')
@@ -209,7 +256,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       voiceError,
       heardInsert,
       sttSupported: browserSttSupported(),
-      ttsSupported: true,
+      ttsSupported:
+        browserTtsSupported() ||
+        Boolean(getByokKey('gemini')) ||
+        Boolean(getByokKey('aiai')),
       speak,
       stopAll,
       startMic,

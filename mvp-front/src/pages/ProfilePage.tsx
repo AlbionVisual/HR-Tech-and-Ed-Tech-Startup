@@ -3,10 +3,11 @@ import { buildSetupLink } from '../ai/bootstrapFromUrl'
 import { clearByokKey, getByokKey, setByokKey } from '../ai/byok'
 import { AI_SETTINGS_EVENT, resolveSelection } from '../ai/selection'
 import type { AiProviderId } from '../config'
-// import { btn, btnPrimary, fieldInput, fieldLabel } from '../ui/btn'
+
+type KeyProvider = Exclude<AiProviderId, 'mock'>
 
 type KeyField = {
-	provider: AiProviderId
+	provider: KeyProvider
 	label: string
 	placeholder: string
 }
@@ -29,7 +30,7 @@ const fields: KeyField[] = [
 	},
 ]
 
-type KeysState = Record<AiProviderId, string>
+type KeysState = Record<KeyProvider, string>
 
 function readKeys(): KeysState {
 	return {
@@ -41,36 +42,30 @@ function readKeys(): KeysState {
 
 export function ProfilePage() {
 	const [keys, setKeys] = useState<KeysState>(() => readKeys())
-	const [saved, setSaved] = useState<AiProviderId | null>(null)
+	const [saved, setSaved] = useState<KeyProvider | null>(null)
 	const [demoLink, setDemoLink] = useState('')
 	const [copied, setCopied] = useState(false)
 	const [selectedLabel, setSelectedLabel] = useState(() => {
 		const selected = resolveSelection()
-		return selected.option
-			? `${selected.provider} / ${selected.model}`
-			: 'ничего'
+		return selected.option?.label ?? 'ничего'
 	})
 
 	useEffect(() => {
 		function sync() {
 			const selected = resolveSelection()
-			setSelectedLabel(
-				selected.option
-					? `${selected.provider} / ${selected.model}`
-					: 'ничего',
-			)
+			setSelectedLabel(selected.option?.label ?? 'ничего')
 			setKeys(readKeys())
 		}
 		window.addEventListener(AI_SETTINGS_EVENT, sync)
 		return () => window.removeEventListener(AI_SETTINGS_EVENT, sync)
 	}, [])
 
-	function save(provider: AiProviderId) {
+	function save(provider: KeyProvider) {
 		setByokKey(keys[provider], provider)
 		setSaved(provider)
 	}
 
-	function clear(provider: AiProviderId) {
+	function clear(provider: KeyProvider) {
 		clearByokKey(provider)
 		setKeys((prev) => ({ ...prev, [provider]: '' }))
 		setSaved(null)
@@ -152,10 +147,15 @@ export function ProfilePage() {
 				<h3 className="m-0 text-base font-bold text-ink">Демо-ссылка с ключами</h3>
 				<p className="m-0 text-sm text-muted">
 					Для жюри: откроют ссылку — ключи сами попадут в localStorage, из
-					адресной строки уберутся.
+					адресной строки уберутся. В ссылку попадает сейчас выбранная модель
+					(<strong className="text-ink">{selectedLabel}</strong>).
 				</p>
 				<div className="flex flex-wrap gap-2">
-					<button type="button" className="px-5 py-2 rounded-xl bg-[#717170] text-white font-medium hover:bg-[#5f5f5e] transition-colors cursor-pointer border-0 shadow-sm" onClick={makeLink}>
+					<button
+						type="button"
+						className="px-5 py-2 rounded-xl bg-[#717170] text-white font-medium hover:bg-[#5f5f5e] transition-colors cursor-pointer border-0 shadow-sm"
+						onClick={makeLink}
+					>
 						Собрать ссылку
 					</button>
 					<button
@@ -174,7 +174,9 @@ export function ProfilePage() {
 						value={demoLink}
 					/>
 				) : null}
-				{copied ? <p className="m-0 text-sm font-medium text-emerald-600">Скопировано</p> : null}
+				{copied ? (
+					<p className="m-0 text-sm font-medium text-emerald-600">Скопировано</p>
+				) : null}
 			</section>
 
 			<section className="mt-2 grid gap-3 bg-[#f5f3ef] p-4 rounded-2xl border border-[#e5e2dc] shadow-sm">

@@ -33,7 +33,6 @@ function sniffAudioMime(buf: ArrayBuffer): string | null {
   const u8 = new Uint8Array(buf)
   if (u8.length < 12) return null
 
-  // RIFF....WAVE
   if (
     u8[0] === 0x52 &&
     u8[1] === 0x49 &&
@@ -47,16 +46,13 @@ function sniffAudioMime(buf: ArrayBuffer): string | null {
     return 'audio/wav'
   }
 
-  // OggS
   if (u8[0] === 0x4f && u8[1] === 0x67 && u8[2] === 0x67 && u8[3] === 0x53) {
     return 'audio/ogg'
   }
 
-  // ID3 tag or MPEG frame sync
   if (u8[0] === 0x49 && u8[1] === 0x44 && u8[2] === 0x33) return 'audio/mpeg'
   if (u8[0] === 0xff && (u8[1] & 0xe0) === 0xe0) return 'audio/mpeg'
 
-  // ftyp (m4a/mp4)
   if (
     u8[4] === 0x66 &&
     u8[5] === 0x74 &&
@@ -66,7 +62,6 @@ function sniffAudioMime(buf: ArrayBuffer): string | null {
     return 'audio/mp4'
   }
 
-  // FLAC
   if (
     u8[0] === 0x66 &&
     u8[1] === 0x4c &&
@@ -76,7 +71,6 @@ function sniffAudioMime(buf: ArrayBuffer): string | null {
     return 'audio/flac'
   }
 
-  // JSON error disguised as 200
   const head = String.fromCharCode(...u8.slice(0, Math.min(u8.length, 32)))
   if (head.trimStart().startsWith('{') || head.trimStart().startsWith('<')) {
     return null
@@ -88,7 +82,6 @@ function sniffAudioMime(buf: ArrayBuffer): string | null {
 function normalizeMime(header: string | null, buf: ArrayBuffer) {
   const sniffed = sniffAudioMime(buf)
   if (sniffed) return sniffed
-
   const raw = (header || '').split(';')[0].trim().toLowerCase()
   if (raw.startsWith('audio/')) return raw
   return 'audio/mpeg'
@@ -103,21 +96,21 @@ async function requestSpeech(
   model: string,
   text: string,
   voice: string,
-  withFormat: boolean,
+  format: 'mp3' | 'wav' | null,
 ): Promise<Response> {
   const body: Record<string, string> = {
     model,
     input: text,
     voice,
   }
-  if (withFormat) body.response_format = 'mp3'
+  if (format) body.response_format = format
 
   return fetch(`${config.ai.aiai.baseUrl}/audio/speech`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      Accept: 'audio/mpeg, audio/*, */*',
+      Accept: 'audio/mpeg, audio/wav, audio/*, */*',
     },
     body: JSON.stringify(body),
   })
@@ -133,12 +126,14 @@ export async function fetchAiaiTtsBlob(
     throw new Error('Для AIAI TTS нужен ключ AIAI.BY в Профиле')
   }
 
-  let withFormat = true
+  // wav лучше декодируется целиком; mp3 — запасной; null — как в доке AIAI
+  const formats: Array<'mp3' | 'wav' | null> = ['mp3', null, 'wav']
   let lastStatus = 0
   let lastBody = ''
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await requestSpeech(apiKey, model, text, voice, withFormat)
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const format = formats[Math.min(attempt, formats.length - 1)]
+    const res = await requestSpeech(apiKey, model, text, voice, format)
 
     if (res.ok) {
       const buf = await res.arrayBuffer()
@@ -147,7 +142,7 @@ export async function fetchAiaiTtsBlob(
       }
 
       const mime = normalizeMime(res.headers.get('content-type'), buf)
-      if (!sniffAudioMime(buf) && mime === 'audio/mpeg') {
+      if (!sniffAudioMime(buf)) {
         const head = new TextDecoder().decode(buf.slice(0, 80)).trimStart()
         if (head.startsWith('{')) {
           throw new Error(readErrorMessage(head, res.status))
@@ -160,10 +155,7 @@ export async function fetchAiaiTtsBlob(
     lastStatus = res.status
     lastBody = await res.text().catch(() => '')
 
-    if (res.status === 400 && withFormat) {
-      withFormat = false
-      continue
-    }
+    if (res.status === 400) continue
 
     if (res.status === 502 || res.status === 503 || res.status === 500) {
       await sleep(400 * (attempt + 1))

@@ -8,8 +8,15 @@ export type TtsModelOption = {
 
 export type TtsModelDef = {
   model: string
+  label: string
   voices: string[]
   defaultVoice: string
+}
+
+export const ttsProviderLabels: Record<TtsProviderId, string> = {
+  browser: 'Браузер',
+  gemini: 'Gemini',
+  aiai: 'AIAI',
 }
 
 const geminiVoices = [
@@ -32,6 +39,7 @@ export const speechConfig = {
     models: [
       {
         model: 'native',
+        label: 'Системный',
         voices: [] as string[],
         defaultVoice: 'native',
       },
@@ -42,26 +50,36 @@ export const speechConfig = {
     models: [
       {
         model: 'gemini-2.5-flash-preview-tts',
+        label: '2.5 Flash Preview TTS',
         voices: geminiVoices,
         defaultVoice: 'Kore',
       },
       {
         model: 'gemini-3.8-flash-lite-tts',
+        label: '3.8 Flash Lite TTS',
         voices: geminiVoices,
         defaultVoice: 'Kore',
       },
       {
         model: 'gemini-3.8-flash-tts',
+        label: '3.8 Flash TTS',
         voices: geminiVoices,
         defaultVoice: 'Kore',
-      }
+      },
     ] satisfies TtsModelDef[],
     defaultModel: 'gemini-2.5-flash-preview-tts',
   },
   aiai: {
     models: [
       {
+        model: 's1',
+        label: 'S1 (Fish Audio)',
+        voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
+        defaultVoice: 'alloy',
+      },
+      {
         model: 'mai-voice-2',
+        label: 'MAI Voice 2',
         voices: [
           'en-us-harper:mai-voice-2',
           'de-de-klaus:mai-voice-2',
@@ -72,21 +90,24 @@ export const speechConfig = {
       },
       {
         model: 'grok-voice-tts-1.0',
+        label: 'Grok Voice TTS',
         voices: ['ara', 'eve', 'leo', 'rex', 'sal'],
         defaultVoice: 'eve',
       },
       {
         model: 'qwen-audio-3.0-tts-flash',
+        label: 'Qwen Audio 3.0 Flash',
         voices: ['longanhuan_v3.6', 'loongjohn'],
         defaultVoice: 'loongjohn',
       },
       {
         model: 'gemini-3.1-flash-tts',
+        label: 'Gemini 3.1 Flash TTS',
         voices: geminiVoices,
-        defaultVoice: 'Kore'
-      }
+        defaultVoice: 'Kore',
+      },
     ] satisfies TtsModelDef[],
-    defaultModel: 'speech-2.8-turbo',
+    defaultModel: 's1',
   },
 }
 
@@ -108,6 +129,13 @@ export function findTtsModelDef(
     return speechConfig.aiai.models.find((m) => m.model === model) ?? null
   }
   return null
+}
+
+export function formatTtsOptionLabel(provider: TtsProviderId, model: string) {
+  const def = findTtsModelDef(provider, model)
+  const name = def?.label ?? model.split('/').pop() ?? model
+  if (provider === 'browser') return `Браузер (${name})`
+  return `${ttsProviderLabels[provider]}: ${name}`
 }
 
 export function voicesForTts(provider: TtsProviderId, model: string) {
