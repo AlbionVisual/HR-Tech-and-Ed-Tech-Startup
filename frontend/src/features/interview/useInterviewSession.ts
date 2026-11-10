@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { chatStream } from '../../ai/client'
-import { resetMockProgress } from '../../ai/providers/mock'
 import { typewriter } from '../../ai/stream/typewriter'
 import type { ChatMessage } from '../../ai/types'
 import { config, type VacancyContext, type VacancyGrade } from '../../config'
@@ -29,8 +28,7 @@ export function useInterviewSession(chatId?: string | null) {
 	const [error, setError] = useState('')
 	const [thought, setThought] = useState('')
 	const [progress, setProgress] = useState(0)
-	const systemRef = useRef('')
-	const abortRef = useRef(0)
+	const abortRef = useRef<AbortController | null>(null)
 
 	const [currentChatId, setCurrentChatId] = useState<string | null>(chatId ?? null)
 	const [createdAtRef, setCreatedAtRef] = useState<number>(Date.now())
@@ -57,11 +55,6 @@ export function useInterviewSession(chatId?: string | null) {
 		nextMode: InterviewMode,
 		nextVacancy: VacancyContext | null,
 	) {
-		const system = config.prompts.buildInterviewSystemPrompt({
-			mode: nextMode,
-			vacancy: nextVacancy,
-		})
-		systemRef.current = system
 		setMode(nextMode)
 		setVacancy(nextVacancy)
 
@@ -74,11 +67,8 @@ export function useInterviewSession(chatId?: string | null) {
 		setError('')
 		setThought('')
 		setProgress(0)
-		resetMockProgress()
 		setPhase('interviewing')
-		await runAssistantTurn([
-			{ role: 'user', content: config.prompts.firstUserKickoff },
-		])
+		await runAssistantTurn([], { mode: nextMode, vacancy: nextVacancy })
 	}
 
 	async function submitVacancy(form: {
@@ -91,8 +81,12 @@ export function useInterviewSession(chatId?: string | null) {
 
 	async function runAssistantTurn(
 		history: { role: 'user' | 'assistant'; content: string }[],
+		context?: { mode: InterviewMode; vacancy: VacancyContext | null },
 	) {
-		const runId = ++abortRef.current
+		abortRef.current?.abort()
+		const controller = new AbortController()
+		abortRef.current = controller
+
 		setStatus('thinking')
 		setError('')
 		setThought('')
@@ -100,14 +94,20 @@ export function useInterviewSession(chatId?: string | null) {
 		const assistantId = uid()
 		let assembled = ''
 		let created = false
+		let sawFeedback = false
 		const tw = config.ai.typewriter
+		const turnMode = context ? context.mode : mode ?? 'practice'
+		const turnVacancy = context ? context.vacancy : vacancy
 
 		try {
 			for await (const event of chatStream({
-				system: systemRef.current,
+				task: 'interview',
+				mode: turnMode,
+				vacancy: turnVacancy,
 				messages: history,
+				signal: controller.signal,
 			})) {
-				if (runId !== abortRef.current) return
+				if (controller.signal.aborted) return
 
 				if (event.type === 'thinking') {
 					setStatus('thinking')
@@ -116,6 +116,14 @@ export function useInterviewSession(chatId?: string | null) {
 				if (event.type === 'thought') {
 					setStatus('thinking')
 					setThought((prev) => prev + event.text)
+					continue
+				}
+				if (event.type === 'progress') {
+					setProgress(event.value)
+					continue
+				}
+				if (event.type === 'feedback') {
+					sawFeedback = true
 					continue
 				}
 				if (event.type === 'error') {
@@ -134,13 +142,11 @@ export function useInterviewSession(chatId?: string | null) {
 					setStatus('streaming')
 
 					for await (const piece of typewriter(event.text, tw)) {
-						if (runId !== abortRef.current) return
+						if (controller.signal.aborted) return
 						assembled += piece
-						const preview = config.prompts.parseAssistantMarkers(assembled)
-						if (preview.progress != null) setProgress(preview.progress)
 						setMessages((prev) =>
 							prev.map((m) =>
-								m.id === assistantId ? { ...m, content: preview.content } : m,
+								m.id === assistantId ? { ...m, content: assembled } : m,
 							),
 						)
 					}
@@ -152,8 +158,7 @@ export function useInterviewSession(chatId?: string | null) {
 						setError('Модель вернула пустой ответ')
 						return
 					}
-					const parsed = config.prompts.parseAssistantMarkers(assembled)
-					if (parsed.progress != null) setProgress(parsed.progress)
+					const content = assembled.trim()
 					setMessages((prev) => {
 						const exists = prev.some((m) => m.id === assistantId)
 						if (!exists) {
@@ -162,20 +167,20 @@ export function useInterviewSession(chatId?: string | null) {
 								{
 									id: assistantId,
 									role: 'assistant',
-									content: parsed.content,
+									content,
 								},
 							]
 						}
 						return prev.map((m) =>
-							m.id === assistantId ? { ...m, content: parsed.content } : m,
+							m.id === assistantId ? { ...m, content } : m,
 						)
 					})
-					setPhase(parsed.isFeedback ? 'awaiting_next' : 'interviewing')
+					setPhase(sawFeedback ? 'awaiting_next' : 'interviewing')
 					setStatus('idle')
 				}
 			}
 		} catch (e) {
-			if (runId !== abortRef.current) return
+			if (controller.signal.aborted) return
 			setStatus('error')
 			setError(e instanceof Error ? e.message : 'Ошибка запроса')
 		}
@@ -214,7 +219,8 @@ export function useInterviewSession(chatId?: string | null) {
 	}
 
 	function reset() {
-		abortRef.current += 1
+		abortRef.current?.abort()
+		abortRef.current = null
 		setPhase('idle')
 		setMode(null)
 		setVacancy(null)
@@ -223,7 +229,6 @@ export function useInterviewSession(chatId?: string | null) {
 		setError('')
 		setThought('')
 		setProgress(0)
-		systemRef.current = ''
 	}
 
 	function startNewChat() {
@@ -256,10 +261,6 @@ export function useInterviewSession(chatId?: string | null) {
 			setProgress(snapshot.progress)
 			setCurrentChatId(snapshot.id)
 			setCreatedAtRef(snapshot.createdAt)
-			systemRef.current = config.prompts.buildInterviewSystemPrompt({
-				mode: snapshot.mode,
-				vacancy: snapshot.vacancy,
-			})
 		} else {
 			if (prevChatId != null) {
 				reset()
@@ -297,6 +298,8 @@ export function useInterviewSession(chatId?: string | null) {
 		isLoaded,
 		createdAtRef,
 	])
+
+	useEffect(() => () => abortRef.current?.abort(), [])
 
 	return {
 		phase,

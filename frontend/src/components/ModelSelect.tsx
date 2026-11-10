@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { loadCatalog } from '../ai/catalog'
 import {
 	AI_SETTINGS_EVENT,
 	listAvailableModels,
@@ -24,14 +25,15 @@ export function ModelSelect({ variant = 'bar' }: Props) {
 			setValue(resolveSelection().option?.id ?? '')
 		}
 		sync()
+		void loadCatalog().then(sync)
 		window.addEventListener(AI_SETTINGS_EVENT, sync)
 		return () => window.removeEventListener(AI_SETTINGS_EVENT, sync)
 	}, [])
 
 	if (!options.length) {
 		return (
-			<span className="whitespace-nowrap text-[0.8rem] text-muted" title="Нет ключей">
-				Нет ключа
+			<span className="whitespace-nowrap text-[0.8rem] text-muted" title="Нет моделей">
+				Нет моделей
 			</span>
 		)
 	}

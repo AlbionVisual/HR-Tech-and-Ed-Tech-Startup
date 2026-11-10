@@ -14,10 +14,10 @@ const icons: Record<string, { active: string; inactive: string }> = {
     active: publicUrl("icons/interview-active.png"),
     inactive: publicUrl("icons/interview-inactive.png"),
   },
-  //   profile: {
-  //     active: publicUrl('icons/profile-active.png'),
-  //     inactive: publicUrl('icons/profile-inactive.png'),
-  //   },
+  profile: {
+    active: publicUrl("icons/profile-active.png"),
+    inactive: publicUrl("icons/profile-inactive.png"),
+  },
 };
 
 type Props = {
@@ -30,7 +30,7 @@ export function BottomNav({ active, onChange }: Props) {
     <nav
       className="
         relative flex items-center justify-around w-full max-w-md mx-auto bg-[#f5f3ef] px-3 py-2 rounded-t-3xl shadow-lg border-t border-line
-        sm:grid sm:grid-cols-3 sm:max-w-none sm:mx-0 sm:rounded-none sm:px-2 sm:py-2 sm:shadow-none
+        sm:grid sm:grid-cols-4 sm:max-w-none sm:mx-0 sm:rounded-none sm:px-2 sm:py-2 sm:shadow-none
       "
       aria-label="Навигация">
       {config.app.pages.map((page) => {

@@ -4,11 +4,12 @@ import { TopBar } from "./components/TopBar";
 import { AccessBanner } from "./components/AccessBanner";
 import { config, type PageId } from "./config";
 import { InterviewPage } from "./pages/InterviewPage";
-// import { ProfilePage } from "./pages/ProfilePage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { ResumePage } from "./pages/ResumePage";
 import { TestsPage } from "./pages/TestsPage";
 import { VoiceProvider } from "./speech/VoiceContext";
 import { getLastChatId, setLastChatId } from "./features/interview/chatStorage";
+import type { ProfileUser } from "./features/profile/types";
 
 function App() {
   const [page, setPage] = useState<PageId>(config.app.defaultPage);
@@ -17,6 +18,7 @@ function App() {
   const [activeChatId, setActiveChatId] = useState<string | null>(() =>
     getLastChatId(),
   );
+  const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
 
   const handleChatSelect = (id: string) => {
     setActiveChatId(id);
@@ -33,17 +35,27 @@ function App() {
   const title =
     config.app.pages.find((p) => p.id === page)?.title ?? "Приложение";
 
+  const isProfile = page === "profile";
+  const isLogin = isProfile && !profileUser;
+  const gridRows = isLogin
+    ? "grid-rows-[1fr]"
+    : isProfile
+      ? "grid-rows-[1fr_var(--spacing-nav)]"
+      : "grid-rows-[var(--spacing-topbar)_1fr_var(--spacing-nav)]";
+
   return (
     <VoiceProvider>
-      <div className="grid h-full grid-rows-[var(--spacing-topbar)_1fr_var(--spacing-nav)] bg-bg font-sans text-ink">
-        <TopBar
-          title={title}
-          isSideMenuOpen={isSideMenuOpen}
-          onToggleSideMenu={() => setIsSideMenuOpen(!isSideMenuOpen)}
-          activeChatId={activeChatId}
-          onChatSelect={handleChatSelect}
-          onNewChat={handleNewChat}
-        />
+      <div className={`grid h-full ${gridRows} bg-bg font-sans text-ink`}>
+        {!isProfile ? (
+          <TopBar
+            title={title}
+            isSideMenuOpen={isSideMenuOpen}
+            onToggleSideMenu={() => setIsSideMenuOpen(!isSideMenuOpen)}
+            activeChatId={activeChatId}
+            onChatSelect={handleChatSelect}
+            onNewChat={handleNewChat}
+          />
+        ) : null}
         <main className="min-h-0 overflow-auto">
           <AccessBanner />
           {page === "tests" ?
@@ -55,9 +67,15 @@ function App() {
           {page === "interview" ?
             <InterviewPage chatId={activeChatId} />
           : null}
-          {/* {page === 'profile' ? <ProfilePage /> : null} */}
+          {isProfile ?
+            <ProfilePage
+              user={profileUser}
+              onLogin={setProfileUser}
+              onLogout={() => setProfileUser(null)}
+            />
+          : null}
         </main>
-        <BottomNav active={page} onChange={setPage} />
+        {!isLogin ? <BottomNav active={page} onChange={setPage} /> : null}
       </div>
     </VoiceProvider>
   );

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { chatStream } from '../../ai/client'
 import { typewriter } from '../../ai/stream/typewriter'
 import type { ChatMessage } from '../../ai/types'
@@ -29,8 +29,7 @@ export function useResumeSession() {
     const [error, setError] = useState('')
     const [thought, setThought] = useState('')
     const [progress, setProgress] = useState(0)
-    const systemRef = useRef('')
-    const abortRef = useRef(0)
+    const abortRef = useRef<AbortController | null>(null)
 
     // Функции выбора режимов (карточек) на главном экране (не запускают ИИ сразу)
     function chooseAtsCheck() {
@@ -56,11 +55,6 @@ export function useResumeSession() {
         const currentMode = mode || 'ats_check'
         setMode(currentMode)
 
-        const system = config.prompts.buildResumeSystemPrompt({
-            mode: currentMode,
-        })
-        systemRef.current = system
-
         const modeLabel = getModeLabel(currentMode)
         const firstContent = `${modeLabel}\n${text}`
 
@@ -76,13 +70,20 @@ export function useResumeSession() {
         setProgress(0)
         setPhase('check_resume')
 
-        await runAssistantTurn([{ role: 'user', content: firstContent }])
+        await runAssistantTurn(
+            [{ role: 'user', content: firstContent }],
+            { mode: currentMode },
+        )
     }
 
     async function runAssistantTurn(
         history: { role: 'user' | 'assistant'; content: string }[],
+        context?: { mode: ResumeMode },
     ) {
-        const runId = ++abortRef.current
+        abortRef.current?.abort()
+        const controller = new AbortController()
+        abortRef.current = controller
+
         setStatus('thinking')
         setError('')
         setThought('')
@@ -90,14 +91,18 @@ export function useResumeSession() {
         const assistantId = uid()
         let assembled = ''
         let created = false
+        let sawFeedback = false
         const tw = config.ai.typewriter
+        const turnMode = context?.mode ?? mode ?? 'ats_check'
 
         try {
             for await (const event of chatStream({
-                system: systemRef.current,
+                task: 'resume',
+                mode: turnMode,
                 messages: history,
+                signal: controller.signal,
             })) {
-                if (runId !== abortRef.current) return
+                if (controller.signal.aborted) return
 
                 if (event.type === 'thinking') {
                     setStatus('thinking')
@@ -106,6 +111,14 @@ export function useResumeSession() {
                 if (event.type === 'thought') {
                     setStatus('thinking')
                     setThought((prev) => prev + event.text)
+                    continue
+                }
+                if (event.type === 'progress') {
+                    setProgress(event.value)
+                    continue
+                }
+                if (event.type === 'feedback') {
+                    sawFeedback = true
                     continue
                 }
                 if (event.type === 'error') {
@@ -124,13 +137,11 @@ export function useResumeSession() {
                     setStatus('streaming')
 
                     for await (const piece of typewriter(event.text, tw)) {
-                        if (runId !== abortRef.current) return
+                        if (controller.signal.aborted) return
                         assembled += piece
-                        const preview = config.prompts.parseAssistantMarkers(assembled)
-                        if (preview.progress != null) setProgress(preview.progress)
                         setMessages((prev) =>
                             prev.map((m) =>
-                                m.id === assistantId ? { ...m, content: preview.content } : m,
+                                m.id === assistantId ? { ...m, content: assembled } : m,
                             ),
                         )
                     }
@@ -142,8 +153,7 @@ export function useResumeSession() {
                         setError('Модель вернула пустой ответ')
                         return
                     }
-                    const parsed = config.prompts.parseAssistantMarkers(assembled)
-                    if (parsed.progress != null) setProgress(parsed.progress)
+                    const content = assembled.trim()
                     setMessages((prev) => {
                         const exists = prev.some((m) => m.id === assistantId)
                         if (!exists) {
@@ -152,20 +162,20 @@ export function useResumeSession() {
                                 {
                                     id: assistantId,
                                     role: 'assistant',
-                                    content: parsed.content,
+                                    content,
                                 },
                             ]
                         }
                         return prev.map((m) =>
-                            m.id === assistantId ? { ...m, content: parsed.content } : m,
+                            m.id === assistantId ? { ...m, content } : m,
                         )
                     })
-                    setPhase(parsed.isFeedback ? 'awaiting_next' : 'check_resume')
+                    setPhase(sawFeedback ? 'awaiting_next' : 'check_resume')
                     setStatus('idle')
                 }
             }
         } catch (e) {
-            if (runId !== abortRef.current) return
+            if (controller.signal.aborted) return
             setStatus('error')
             setError(e instanceof Error ? e.message : 'Ошибка запроса')
         }
@@ -192,7 +202,8 @@ export function useResumeSession() {
     }
 
     function reset() {
-        abortRef.current += 1
+        abortRef.current?.abort()
+        abortRef.current = null
         setPhase('idle')
         setMode(null)
         setMessages([])
@@ -200,8 +211,9 @@ export function useResumeSession() {
         setError('')
         setThought('')
         setProgress(0)
-        systemRef.current = ''
     }
+
+    useEffect(() => () => abortRef.current?.abort(), [])
 
     return {
         phase,

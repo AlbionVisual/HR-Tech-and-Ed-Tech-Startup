@@ -1,4 +1,4 @@
-import { appConfig, publicUrl } from './app'
+import { apiBaseUrl, appConfig, publicUrl } from './app'
 import {
   aiConfig,
   formatModelOptionLabel,
@@ -8,7 +8,6 @@ import {
   getProviderModels,
   providerLabels,
 } from './ai'
-import { promptsConfig } from './prompts'
 import {
   defaultVoiceForTts,
   findTtsModelDef,
@@ -23,11 +22,11 @@ import {
 export const config = {
   app: appConfig,
   ai: aiConfig,
-  prompts: promptsConfig,
   speech: speechConfig,
 } as const
 
 export {
+  apiBaseUrl,
   defaultVoiceForTts,
   findTtsModelDef,
   formatModelOptionLabel,
@@ -45,5 +44,5 @@ export {
 }
 export type { PageId } from './app'
 export type { AiModelDef, AiProviderId } from './ai'
-export type { VacancyGrade, VacancyContext } from './prompts'
+export type { VacancyGrade, VacancyContext } from './vacancy'
 export type { TtsModelDef, TtsModelOption, TtsProviderId } from './speech'

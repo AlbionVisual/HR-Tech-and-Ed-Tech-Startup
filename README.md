@@ -33,7 +33,7 @@ README.md
 ## Запуск
 
 ```
-cd mvp-front
+cd frontend
 npm install
 npm run dev
 ```
@@ -43,6 +43,6 @@ Dev-сервер — **HTTPS** (self-signed через `@vitejs/plugin-basic-ssl
 Обычный билд → `mvp-front/dist`:
 
 ```
-cd mvp-front
+cd frontend
 npm run build
 ```

@@ -1,50 +1,74 @@
-import { geminiProbeMessage, probeGeminiAccess } from './probeGemini'
+import { apiBaseUrl } from '../config'
 import { resolveSelection } from './selection'
-import { aiaiProvider } from './providers/aiai'
-import { geminiProvider } from './providers/gemini'
-import { mockProvider } from './providers/mock'
-import { openrouterProvider } from './providers/openrouter'
-import type { AiProvider } from './providers/types'
-import type { ChatStreamInput, StreamEvent } from './types'
+import { parseSse } from './stream/parseSse'
+import type { ChatRequest, StreamEvent } from './types'
 
-function getProvider(provider: string): AiProvider {
-  if (provider === 'openrouter') return openrouterProvider
-  if (provider === 'aiai') return aiaiProvider
-  if (provider === 'mock') return mockProvider
-  return geminiProvider
+async function readError(response: Response) {
+  const text = await response.text().catch(() => '')
+  try {
+    const payload = JSON.parse(text) as {
+      detail?: { message?: string } | string
+    }
+    if (typeof payload.detail === 'string') return payload.detail
+    if (payload.detail?.message) return payload.detail.message
+  } catch {
+    // keep raw text
+  }
+  const trimmed = text.trim()
+  return trimmed.slice(0, 500) || `Ошибка API (${response.status})`
 }
 
 export async function* chatStream(
-  input: Omit<ChatStreamInput, 'apiKey' | 'model'> & {
-    apiKey?: string
-    model?: string
-  },
+  input: ChatRequest,
 ): AsyncIterable<StreamEvent> {
   const selected = resolveSelection()
-  const provider = getProvider(selected.provider)
-  const apiKey = input.apiKey ?? selected.apiKey
-  const model = input.model ?? selected.model
-
-  if (selected.provider === 'gemini') {
-    const probe = await probeGeminiAccess()
-    if (!probe.ok && probe.reason === 'blocked') {
-      yield { type: 'error', message: geminiProbeMessage(probe) }
-      return
-    }
+  const body = {
+    task: input.task,
+    mode: input.mode,
+    vacancy: input.vacancy ?? null,
+    messages: input.messages,
+    provider: input.provider ?? selected.provider,
+    model: input.model ?? selected.model,
   }
 
-  if (selected.provider !== 'mock' && !apiKey) {
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/api/v1/ai/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: input.signal,
+    })
+  } catch (error) {
+    if (input.signal?.aborted) return
     yield {
       type: 'error',
-      message:
-        'Нет API-ключа для выбранной модели. Добавьте ключ в Профиле (Gemini / OpenRouter / AIAI.BY) или выберите «имитация модели».',
+      message: error instanceof Error ? error.message : 'Ошибка сети',
     }
     return
   }
 
-  yield* provider.chatStream({
-    ...input,
-    apiKey: apiKey || 'mock',
-    model,
-  })
+  if (!response.ok || !response.body) {
+    yield { type: 'error', message: await readError(response) }
+    return
+  }
+
+  try {
+    for await (const data of parseSse(response.body)) {
+      let event: StreamEvent
+      try {
+        event = JSON.parse(data) as StreamEvent
+      } catch {
+        continue
+      }
+      yield event
+      if (event.type === 'done' || event.type === 'error') return
+    }
+  } catch (error) {
+    if (input.signal?.aborted) return
+    yield {
+      type: 'error',
+      message: error instanceof Error ? error.message : 'Ошибка чтения потока',
+    }
+  }
 }
