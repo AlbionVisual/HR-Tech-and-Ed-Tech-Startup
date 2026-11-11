@@ -1,8 +1,11 @@
-# Backend
+# Backend — FastAPI
 
-FastAPI-сервис проекта HR-Tech & Ed-Tech Startup.
+Серверная часть HR-Tech & Ed-Tech Startup: AI-провайдеры, анализ резюме и API.
 
-## Первый запуск
+Сейчас данные резюме хранятся в памяти процесса. PostgreSQL и авторизация —
+следующие этапы.
+
+## Запуск
 
 Нужны Python 3.12+ и [uv](https://docs.astral.sh/uv/).
 
@@ -13,70 +16,67 @@ uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-В `.env` нужно вписать хотя бы один ключ провайдера:
-
-```env
-GEMINI_API_KEY=
-OPENROUTER_API_KEY=
-AIAI_API_KEY=
-```
-
-Без ключей доступен только провайдер `mock` — чат работает в демо-режиме.
+Без ключей AI-провайдеров доступен только `mock`.
 
 Проверка:
 
-- http://localhost:8000/health
-- http://localhost:8000/api/v1/health
-- http://localhost:8000/api/v1/ai/models
 - http://localhost:8000/docs
+- http://localhost:8000/health
+- http://localhost:8000/api/v1/ai/models
 
-## AI API
+## Переменные окружения
 
-- `GET /api/v1/ai/models` — доступные провайдеры и модели.
-- `POST /api/v1/ai/chat/stream` — SSE-стрим ответа.
-- `GET /api/v1/ai/probe?provider=gemini` — проверка доступности Gemini с сервера.
+```env
+APP_NAME=HR/Ed Tech API
+ENVIRONMENT=local
+API_V1_PREFIX=/api/v1
 
-Запрос чата:
+GEMINI_API_KEY=
+OPENROUTER_API_KEY=
+AIAI_API_KEY=
 
-```json
-{
-  "task": "interview",
-  "mode": "practice",
-  "vacancy": null,
-  "messages": [{ "role": "user", "content": "..." }],
-  "provider": "openrouter",
-  "model": "nvidia/nemotron-3-ultra-550b-a55b:free"
-}
+AI_DEFAULT_PROVIDER=openrouter
+AI_CORS_ORIGINS=http://localhost:5273,https://albionvisual.github.io
+AI_TIMEOUT_SECONDS=120
+AI_MAX_MESSAGES=100
+AI_MAX_MESSAGE_CHARS=50000
 ```
 
-События стрима: `thinking`, `thought`, `delta`, `progress`, `feedback`, `done`, `error`.
+## API
+
+### AI
+
+- `GET /api/v1/ai/models` — провайдеры и модели.
+- `POST /api/v1/ai/chat/stream` — SSE-стрим интервью.
+- `GET /api/v1/ai/probe?provider=gemini` — проверка Gemini.
+
+### Резюме
+
+- `POST /api/v1/resumes/extract` — извлечение текста из PDF/DOCX.
+- `POST /api/v1/resumes/checks:stream` — создать проверку и получить анализ.
+- `POST /api/v1/resumes/checks/{id}/messages:stream` — продолжить диалог.
+- `GET /api/v1/resumes/checks` — история.
+- `GET /api/v1/resumes/checks/{id}` — проверка с сообщениями.
+- `DELETE /api/v1/resumes/checks/{id}` — удалить проверку.
+
+SSE-события: `meta`, `thinking`, `thought`, `delta`, `progress`, `feedback`,
+`done`, `error`.
 
 ## Структура
-
-`core/` — единое место для всех микросервисов backend: настройки, доступ к БД, AI и другие интеграции. Новые сервисы складываем сюда, чтобы не плодить отдельные папки.
 
 ```text
 backend/
 ├── app/
-│   ├── main.py                  # FastAPI, CORS, lifespan с httpx
+│   ├── main.py                  # FastAPI, CORS, lifespan
+│   ├── api/v1/                  # роутеры, deps, SSE, ошибки
 │   ├── core/
 │   │   ├── config.py            # настройки из .env
-│   │   └── ai/
-│   │       ├── prompts.py       # промпты, kickoff, маркеры
-│   │       ├── providers.py     # Gemini, OpenRouter, AIAI, mock
-│   │       └── service.py       # AiChatService, SSE, MarkerFilter
-│   └── api/
-│       └── v1/
-│           ├── router.py        # подключение роутеров
-│           └── endpoints/
-│               ├── health.py    # GET /api/v1/health
-│               └── ai.py        # /api/v1/ai/*
-├── tests/                       # pytest
-├── .env.example
-├── .gitignore
+│   │   ├── deps.py              # временный demo user
+│   │   └── ai/                  # провайдеры, промпты, SSE
+│   └── modules/resumes/         # домен резюме, парсеры, repository
+├── tests/
 ├── pyproject.toml
-├── uv.lock
-└── README.md
+└── uv.lock
 ```
 
 ## Тесты
