@@ -1,13 +1,5 @@
 import { apiBaseUrl, appConfig, publicUrl } from './app'
-import {
-  aiConfig,
-  formatModelOptionLabel,
-  getModelLabel,
-  getProviderDefaultModel,
-  getProviderModelDefs,
-  getProviderModels,
-  providerLabels,
-} from './ai'
+import { aiConfig, providerLabels } from './ai'
 import {
   defaultVoiceForTts,
   findTtsModelDef,
@@ -29,12 +21,7 @@ export {
   apiBaseUrl,
   defaultVoiceForTts,
   findTtsModelDef,
-  formatModelOptionLabel,
   formatTtsOptionLabel,
-  getModelLabel,
-  getProviderDefaultModel,
-  getProviderModelDefs,
-  getProviderModels,
   makeTtsId,
   parseTtsId,
   providerLabels,

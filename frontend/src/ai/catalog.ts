@@ -1,11 +1,4 @@
-import {
-  apiBaseUrl,
-  config,
-  formatModelOptionLabel,
-  getProviderDefaultModel,
-  getProviderModelDefs,
-  type AiProviderId,
-} from '../config'
+import { apiBaseUrl, config, type AiProviderId } from '../config'
 import { notifyAiSettingsChanged } from './events'
 
 export type ModelOption = {
@@ -21,7 +14,6 @@ export type CatalogDefault = {
 }
 
 const STORAGE_KEY = 'mvp.ai.catalog'
-const PROVIDERS: AiProviderId[] = ['openrouter', 'gemini', 'aiai']
 
 export function makeModelId(provider: AiProviderId, model: string) {
   return `${provider}::${model}`
@@ -55,26 +47,10 @@ function makeOption(
   return { id: makeModelId(provider, model), provider, model, label }
 }
 
-function fallbackOptions(): ModelOption[] {
-  const options: ModelOption[] = []
-  for (const provider of PROVIDERS) {
-    for (const model of getProviderModelDefs(provider)) {
-      if (!model.id) continue
-      options.push(
-        makeOption(
-          provider,
-          model.id,
-          formatModelOptionLabel(provider, model.id),
-        ),
-      )
-    }
-  }
-  return options
-}
-
 function fallbackDefault(): CatalogDefault {
-  const provider = config.ai.preferredProvider
-  return { provider, model: getProviderDefaultModel(provider) }
+  // Модель станет известна после загрузки каталога с backend.
+  // Пустая строка означает «использовать модель по умолчанию на сервере».
+  return { provider: config.ai.preferredProvider, model: '' }
 }
 
 function readCache(): {
@@ -99,7 +75,7 @@ function readCache(): {
 }
 
 const cached = readCache()
-let options: ModelOption[] = cached?.options ?? fallbackOptions()
+let options: ModelOption[] = cached?.options ?? []
 let defaultSelection: CatalogDefault = cached?.default ?? fallbackDefault()
 let loading: Promise<void> | null = null
 
@@ -151,7 +127,7 @@ export async function loadCatalog(): Promise<void> {
       )
       notifyAiSettingsChanged()
     } catch {
-      // keep the fallback catalog
+      // Оставляем ранее закэшированный каталог, если backend недоступен.
     } finally {
       loading = null
     }
