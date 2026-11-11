@@ -1,4 +1,4 @@
-from app.core.ai.service import MarkerFilter
+from app.core.ai.markers import MarkerFilter
 
 
 def run(chunks: list[str]) -> list[dict]:

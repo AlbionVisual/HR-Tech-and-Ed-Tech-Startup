@@ -4,6 +4,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.errors import install_error_handlers
 from app.api.v1.router import api_router
 from app.core.config import settings
 
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+install_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

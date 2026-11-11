@@ -6,11 +6,15 @@ dependencies = [
     "fastapi>=0.162.2",
     "httpx>=0.28.0",
     "pydantic-settings>=2.16.2",
+    "pypdf>=7.0.1",
+    "python-docx>=1.2.0",
+    "python-multipart>=0.0.33",
     "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
+    "fpdf2>=2.9.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
 ]
@@ -19,3 +23,4 @@ dev = [
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+pythonpath = ["."]

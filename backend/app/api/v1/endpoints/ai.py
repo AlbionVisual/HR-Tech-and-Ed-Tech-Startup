@@ -1,17 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from app.core.ai.service import AiChatService, AiRequestError, ChatRequest
-from app.core.config import settings
+from app.api.v1.deps import get_ai_service
+from app.api.v1.sse import sse_response
+from app.core.ai.schemas import ChatRequest
+from app.core.ai.service import AiChatService
 
 router = APIRouter()
-
-
-def get_ai_service(request: Request) -> AiChatService:
-    return AiChatService(
-        settings=settings,
-        http=getattr(request.app.state, "http", None),
-    )
 
 
 @router.post("/chat/stream")
@@ -19,23 +14,7 @@ async def chat_stream(
     payload: ChatRequest,
     service: AiChatService = Depends(get_ai_service),
 ) -> StreamingResponse:
-    try:
-        prepared = service.prepare(payload)
-    except AiRequestError as error:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "bad_request", "message": str(error)},
-        ) from error
-
-    return StreamingResponse(
-        service.stream(prepared),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
+    return sse_response(service.stream(service.prepare(payload)))
 
 
 @router.get("/models")

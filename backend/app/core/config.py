@@ -33,13 +33,7 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.ai_cors_origins.split(",") if item.strip()]
 
     def api_key_for(self, provider: str) -> str:
-        if provider == "gemini":
-            return self.gemini_api_key
-        if provider == "openrouter":
-            return self.openrouter_api_key
-        if provider == "aiai":
-            return self.aiai_api_key
-        return ""
+        return str(getattr(self, f"{provider}_api_key", "") or "")
 
 
 settings = Settings()

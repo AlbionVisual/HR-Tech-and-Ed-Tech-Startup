@@ -1,4 +1,4 @@
-from app.core.ai.providers import parse_gemini_chunk, parse_openai_chunk, sse_payload
+from app.core.ai.parsing import parse_gemini_chunk, parse_openai_chunk, sse_payload
 
 
 def test_gemini_thought_and_answer() -> None:
