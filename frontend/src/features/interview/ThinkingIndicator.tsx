@@ -7,12 +7,15 @@ type Props = {
 
 export function ThinkingIndicator({ thought, live = false }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const [prevLive, setPrevLive] = useState(live)
   const bodyRef = useRef<HTMLDivElement>(null)
   const hasThought = Boolean(thought?.trim())
 
-  useEffect(() => {
+  // Сворачиваем блок при смене live без setState в useEffect.
+  if (live !== prevLive) {
+    setPrevLive(live)
     setExpanded(false)
-  }, [live])
+  }
 
   useEffect(() => {
     if (!live || expanded) return

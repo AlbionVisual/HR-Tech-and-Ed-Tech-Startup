@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { extractResume, type ResumeSource } from "../../api/resumes";
 import type { ChatMessage } from "../../ai/types";
 import { useVoice } from "../../speech/VoiceContext";
 import { ChatMessageList } from "./ChatMessageList";
@@ -6,7 +7,6 @@ import { Composer } from "../interview/Composer";
 // import { FeedbackActions } from '../interview/FeedbackActions'
 import { ResumeStartGrid } from "./ResumeStartGrid";
 import type { ResumeMode, ResumePhase } from "./useResumeSession";
-import { RESUME_PRESETS } from "./presets";
 
 type Props = {
   messages: ChatMessage[];
@@ -19,9 +19,16 @@ type Props = {
   onChooseImproveExperience: () => void;
   onChooseKeywords: () => void;
   onChooseFormatting: () => void;
-  onStartCheck: (resumeText: string) => void;
+  onStartCheck: (resumeText: string, source?: ResumeSource) => void;
   onSend: (text: string) => void;
   onRefine: () => void;
+};
+
+type FileInfo = {
+  filename: string;
+  sourceType: "pdf" | "docx";
+  chars: number;
+  truncated: boolean;
 };
 
 export function ChatView({
@@ -38,13 +45,37 @@ export function ChatView({
   onStartCheck,
   onSend,
 }: Props) {
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [presetText, setPresetText] = useState<string>("");
+  const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
+  const [fileError, setFileError] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSelectPreset = (id: string, text: string) => {
-    setSelectedPresetId(id);
-    setPresetText(text);
-  };
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setExtracting(true);
+    setFileError("");
+    setFileInfo(null);
+    try {
+      const extracted = await extractResume(file);
+      setPresetText(extracted.text);
+      setFileInfo({
+        filename: extracted.filename,
+        sourceType: extracted.source_type,
+        chars: extracted.chars,
+        truncated: extracted.truncated,
+      });
+    } catch (error) {
+      setFileError(
+        error instanceof Error ? error.message : "Не удалось извлечь текст",
+      );
+    } finally {
+      setExtracting(false);
+    }
+  }
 
   const listRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -65,7 +96,15 @@ export function ChatView({
 
   const handleSubmit = (text: string) => {
     if (isIdle) {
-      onStartCheck(text);
+      const source = fileInfo
+        ? {
+            sourceType: fileInfo.sourceType,
+            sourceFilename: fileInfo.filename,
+          }
+        : undefined;
+      onStartCheck(text, source);
+      setFileInfo(null);
+      setFileError("");
     } else {
       onSend(text);
     }
@@ -97,36 +136,42 @@ export function ChatView({
       : <div className="flex flex-col gap-1 p-2 pt-0">
           {isIdle && (
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-normal text-gray-500 text-left">
-                Попробуйте, используя готовые резюме
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(event) => void handleFileChange(event)}
+                />
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-2xl border border-[#b6b3ad] bg-white text-sm font-medium text-gray-800 hover:bg-[#f5f3ef] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={extracting || busy}
+                >
+                  {extracting ? "Извлекаю текст…" : "Загрузить PDF/DOCX"}
+                </button>
 
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                {RESUME_PRESETS.map((preset) => {
-                  const isSelected = selectedPresetId === preset.id;
-
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => handleSelectPreset(preset.id, preset.text)}
-                      className={`px-3 py-2  border border-[#b6b3ad]  rounded-2xl text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                        isSelected ?
-                          "bg-[#98D2B9] text-gray-900"
-                        : "bg-[#f5f3ef] text-gray-800 hover:bg-[#ede9e2]"
-                      }`}>
-                      {preset.label}
-                    </button>
-                  );
-                })}
+                {fileInfo ? (
+                  <span className="text-xs text-gray-500">
+                    {fileInfo.filename} · {fileInfo.chars} символов
+                    {fileInfo.truncated ? " · текст обрезан" : ""}
+                  </span>
+                ) : null}
               </div>
+
+              {fileError ? (
+                <p className="m-0 text-sm text-danger">{fileError}</p>
+              ) : null}
+
             </div>
           )}
           <Composer
-            disabled={busy}
+            disabled={busy || extracting}
             value={presetText}
             onSend={handleSubmit}
-            textPlaceholder={"Отправьте резюме"}
+            textPlaceholder={extracting ? "Извлекаю текст…" : "Отправьте резюме"}
           />
         </div>
       }

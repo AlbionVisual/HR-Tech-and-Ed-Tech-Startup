@@ -65,7 +65,7 @@ function App() {
             <ResumePage />
           : null}
           {page === "interview" ?
-            <InterviewPage chatId={activeChatId} />
+            <InterviewPage key={activeChatId ?? "new"} chatId={activeChatId} />
           : null}
           {isProfile ?
             <ProfilePage

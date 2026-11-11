@@ -17,7 +17,9 @@ function appendChunk(prev: string, chunk: string) {
 }
 
 export function Composer({ disabled, onSend, textPlaceholder, value }: Props) {
-	const [text, setText] = useState('')
+	const [text, setText] = useState(value ?? '')
+	const [prevValue, setPrevValue] = useState(value)
+	const [handledHeardId, setHandledHeardId] = useState<number | null>(null)
 	const [expanded, setExpanded] = useState(false)
 	const [micError, setMicError] = useState('')
 	const ref = useRef<HTMLTextAreaElement>(null)
@@ -30,16 +32,21 @@ export function Composer({ disabled, onSend, textPlaceholder, value }: Props) {
 		consumeHeardInsert,
 	} = useVoice()
 
-	useEffect(() => {
-		if (value !== undefined) {
-			setText(value)
-		}
-	}, [value])
+	// Синхронизация с value без setState в useEffect: React допускает
+	// корректировку state во время рендера при изменении пропа.
+	if (value !== undefined && value !== prevValue) {
+		setPrevValue(value)
+		setText(value)
+	}
+
+	// Новый распознанный фрагмент добавляем в поле ввода один раз.
+	if (heardInsert && heardInsert.id !== handledHeardId) {
+		setHandledHeardId(heardInsert.id)
+		setText((prev) => appendChunk(prev, heardInsert.text))
+	}
 
 	useEffect(() => {
-		if (!heardInsert) return
-		setText((prev) => appendChunk(prev, heardInsert.text))
-		consumeHeardInsert(heardInsert.id)
+		if (heardInsert) consumeHeardInsert(heardInsert.id)
 	}, [heardInsert, consumeHeardInsert])
 
 	useEffect(() => {

@@ -121,7 +121,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    void runAccessChecks()
+    // Проверку доступа запускаем вне синхронного тела эффекта,
+    // чтобы не вызывать setState внутри useEffect.
+    const timer = window.setTimeout(() => {
+      void runAccessChecks()
+    }, 0)
 
     function onOnline() {
       void runAccessChecks()
@@ -134,6 +138,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     window.addEventListener(TTS_SETTINGS_EVENT, onSettings)
     window.addEventListener(AI_SETTINGS_EVENT, onSettings)
     return () => {
+      window.clearTimeout(timer)
       window.removeEventListener('online', onOnline)
       window.removeEventListener(TTS_SETTINGS_EVENT, onSettings)
       window.removeEventListener(AI_SETTINGS_EVENT, onSettings)
@@ -311,6 +316,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>
 }
 
+// Хук живёт рядом с провайдером намеренно: это публичный API контекста.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useVoice() {
   const ctx = useContext(VoiceContext)
   if (!ctx) throw new Error('useVoice outside VoiceProvider')

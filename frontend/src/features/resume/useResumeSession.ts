@@ -1,248 +1,258 @@
 import { useEffect, useRef, useState } from 'react'
-import { chatStream } from '../../ai/client'
+import {
+  sendResumeMessageStream,
+  startResumeCheckStream,
+  type ResumeMode,
+  type ResumeSource,
+  type ResumeStreamEvent,
+} from '../../api/resumes'
 import { typewriter } from '../../ai/stream/typewriter'
 import type { ChatMessage } from '../../ai/types'
 import { config } from '../../config'
 
-export type ResumeMode =
-    | 'ats_check'
-    | 'improve_experience'
-    | 'keywords'
-    | 'formatting'
+export type { ResumeMode } from '../../api/resumes'
 
 export type ResumePhase =
-    | 'idle'
-    | 'check_resume'
-    | 'awaiting_next'
+  | 'idle'
+  | 'check_resume'
+  | 'awaiting_next'
+
+type Status = 'idle' | 'thinking' | 'streaming' | 'error'
 
 function uid() {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 export function useResumeSession() {
-    const [phase, setPhase] = useState<ResumePhase>('idle')
-    const [mode, setMode] = useState<ResumeMode | null>(null)
-    const [messages, setMessages] = useState<ChatMessage[]>([])
-    const [status, setStatus] = useState<'idle' | 'thinking' | 'streaming' | 'error'>(
-        'idle',
-    )
-    const [error, setError] = useState('')
-    const [thought, setThought] = useState('')
-    const [progress, setProgress] = useState(0)
-    const abortRef = useRef<AbortController | null>(null)
+  const [phase, setPhase] = useState<ResumePhase>('idle')
+  const [mode, setMode] = useState<ResumeMode | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [status, setStatus] = useState<Status>('idle')
+  const [error, setError] = useState('')
+  const [thought, setThought] = useState('')
+  const [progress, setProgress] = useState(0)
+  const [checkId, setCheckId] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-    // Функции выбора режимов (карточек) на главном экране (не запускают ИИ сразу)
-    function chooseAtsCheck() {
-        setMode('ats_check')
-    }
+  function chooseAtsCheck() {
+    setMode('ats_check')
+  }
 
-    function chooseImproveExperience() {
-        setMode('improve_experience')
-    }
+  function chooseImproveExperience() {
+    setMode('improve_experience')
+  }
 
-    function chooseKeywords() {
-        setMode('keywords')
-    }
+  function chooseKeywords() {
+    setMode('keywords')
+  }
 
-    function chooseFormatting() {
-        setMode('formatting')
-    }
+  function chooseFormatting() {
+    setMode('formatting')
+  }
 
-    async function startResumeCheck(resumeText: string) {
-        const text = resumeText.trim()
-        if (!text || status === 'thinking' || status === 'streaming') return
+  async function consumeStream(
+    events: AsyncIterable<ResumeStreamEvent>,
+    controller: AbortController,
+  ) {
+    const assistantId = uid()
+    let assembled = ''
+    let created = false
+    let sawFeedback = false
 
-        const currentMode = mode || 'ats_check'
-        setMode(currentMode)
+    for await (const event of events) {
+      if (controller.signal.aborted) return
 
-        const modeLabel = getModeLabel(currentMode)
-        const firstContent = `${modeLabel}\n${text}`
-
-        const firstMessage: ChatMessage = {
-            id: uid(),
-            role: 'user',
-            content: firstContent,
-        }
-
-        setMessages([firstMessage])
-        setError('')
-        setThought('')
-        setProgress(0)
-        setPhase('check_resume')
-
-        await runAssistantTurn(
-            [{ role: 'user', content: firstContent }],
-            { mode: currentMode },
-        )
-    }
-
-    async function runAssistantTurn(
-        history: { role: 'user' | 'assistant'; content: string }[],
-        context?: { mode: ResumeMode },
-    ) {
-        abortRef.current?.abort()
-        const controller = new AbortController()
-        abortRef.current = controller
-
+      if (event.type === 'meta') {
+        setCheckId(event.check_id)
+        continue
+      }
+      if (event.type === 'thinking') {
         setStatus('thinking')
-        setError('')
-        setThought('')
-
-        const assistantId = uid()
-        let assembled = ''
-        let created = false
-        let sawFeedback = false
-        const tw = config.ai.typewriter
-        const turnMode = context?.mode ?? mode ?? 'ats_check'
-
-        try {
-            for await (const event of chatStream({
-                task: 'resume',
-                mode: turnMode,
-                messages: history,
-                signal: controller.signal,
-            })) {
-                if (controller.signal.aborted) return
-
-                if (event.type === 'thinking') {
-                    setStatus('thinking')
-                    continue
-                }
-                if (event.type === 'thought') {
-                    setStatus('thinking')
-                    setThought((prev) => prev + event.text)
-                    continue
-                }
-                if (event.type === 'progress') {
-                    setProgress(event.value)
-                    continue
-                }
-                if (event.type === 'feedback') {
-                    sawFeedback = true
-                    continue
-                }
-                if (event.type === 'error') {
-                    setStatus('error')
-                    setError(event.message)
-                    return
-                }
-                if (event.type === 'delta') {
-                    if (!created) {
-                        created = true
-                        setMessages((prev) => [
-                            ...prev,
-                            { id: assistantId, role: 'assistant', content: '' },
-                        ])
-                    }
-                    setStatus('streaming')
-
-                    for await (const piece of typewriter(event.text, tw)) {
-                        if (controller.signal.aborted) return
-                        assembled += piece
-                        setMessages((prev) =>
-                            prev.map((m) =>
-                                m.id === assistantId ? { ...m, content: assembled } : m,
-                            ),
-                        )
-                    }
-                    continue
-                }
-                if (event.type === 'done') {
-                    if (!assembled.trim()) {
-                        setStatus('error')
-                        setError('Модель вернула пустой ответ')
-                        return
-                    }
-                    const content = assembled.trim()
-                    setMessages((prev) => {
-                        const exists = prev.some((m) => m.id === assistantId)
-                        if (!exists) {
-                            return [
-                                ...prev,
-                                {
-                                    id: assistantId,
-                                    role: 'assistant',
-                                    content,
-                                },
-                            ]
-                        }
-                        return prev.map((m) =>
-                            m.id === assistantId ? { ...m, content } : m,
-                        )
-                    })
-                    setPhase(sawFeedback ? 'awaiting_next' : 'check_resume')
-                    setStatus('idle')
-                }
-            }
-        } catch (e) {
-            if (controller.signal.aborted) return
-            setStatus('error')
-            setError(e instanceof Error ? e.message : 'Ошибка запроса')
+        continue
+      }
+      if (event.type === 'thought') {
+        setStatus('thinking')
+        setThought((prev) => prev + event.text)
+        continue
+      }
+      if (event.type === 'progress') {
+        setProgress(event.value)
+        continue
+      }
+      if (event.type === 'feedback') {
+        sawFeedback = true
+        continue
+      }
+      if (event.type === 'error') {
+        setStatus('error')
+        setError(event.message)
+        return
+      }
+      if (event.type === 'delta') {
+        if (!created) {
+          created = true
+          setMessages((prev) => [
+            ...prev,
+            { id: assistantId, role: 'assistant', content: '' },
+          ])
         }
-    }
+        setStatus('streaming')
 
-    async function sendUserMessage(text: string) {
-        const content = text.trim()
-        if (!content || status === 'thinking' || status === 'streaming') return
-        if (phase !== 'check_resume' && phase !== 'awaiting_next') return
+        for await (const piece of typewriter(event.text, config.ai.typewriter)) {
+          if (controller.signal.aborted) return
+          assembled += piece
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: assembled }
+                : message,
+            ),
+          )
+        }
+        continue
+      }
+      if (event.type === 'done') {
+        if (!assembled.trim()) {
+          setStatus('error')
+          setError('Модель вернула пустой ответ')
+          return
+        }
 
-        const userMessage: ChatMessage = { id: uid(), role: 'user', content }
-        const next = [...messages, userMessage]
-        setMessages(next)
-        setPhase('check_resume')
-
-        await runAssistantTurn(
-            next.map((m) => ({ role: m.role, content: m.content })),
+        const finalId = event.assistant_message_id || assistantId
+        const content = assembled.trim()
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId
+              ? { ...message, id: finalId, content }
+              : message,
+          ),
         )
-    }
-
-    async function refineAnswer() {
-        if (phase !== 'awaiting_next') return
-        setPhase('check_resume')
-    }
-
-    function reset() {
-        abortRef.current?.abort()
-        abortRef.current = null
-        setPhase('idle')
-        setMode(null)
-        setMessages([])
+        setPhase(
+          sawFeedback || event.status === 'awaiting_next'
+            ? 'awaiting_next'
+            : 'check_resume',
+        )
         setStatus('idle')
-        setError('')
-        setThought('')
-        setProgress(0)
+        return
+      }
+    }
+  }
+
+  async function runStream(
+    events: AsyncIterable<ResumeStreamEvent>,
+    controller: AbortController,
+  ) {
+    try {
+      await consumeStream(events, controller)
+    } catch (error) {
+      if (controller.signal.aborted) return
+      setStatus('error')
+      setError(error instanceof Error ? error.message : 'Ошибка анализа резюме')
+    }
+  }
+
+  async function startResumeCheck(
+    resumeText: string,
+    source?: ResumeSource,
+  ) {
+    const text = resumeText.trim()
+    if (!text || status === 'thinking' || status === 'streaming') return
+
+    const currentMode = mode || 'ats_check'
+    setMode(currentMode)
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setMessages([{ id: uid(), role: 'user', content: text }])
+    setCheckId(null)
+    setError('')
+    setThought('')
+    setProgress(0)
+    setPhase('check_resume')
+    setStatus('thinking')
+
+    await runStream(
+      startResumeCheckStream({
+        mode: currentMode,
+        text,
+        source,
+        signal: controller.signal,
+      }),
+      controller,
+    )
+  }
+
+  async function sendUserMessage(text: string) {
+    const content = text.trim()
+    if (!content || status === 'thinking' || status === 'streaming') return
+    if (phase !== 'check_resume' && phase !== 'awaiting_next') return
+    if (!checkId) {
+      setStatus('error')
+      setError('Проверка резюме ещё не создана')
+      return
     }
 
-    useEffect(() => () => abortRef.current?.abort(), [])
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
 
-    return {
-        phase,
-        mode,
-        messages,
-        status,
-        error,
-        thought,
-        progress,
-        chooseAtsCheck,
-        chooseImproveExperience,
-        chooseKeywords,
-        chooseFormatting,
-        startResumeCheck,
-        sendUserMessage,
-        refineAnswer,
-        reset,
-    }
-}
+    setMessages((prev) => [
+      ...prev,
+      { id: uid(), role: 'user', content },
+    ])
+    setError('')
+    setThought('')
+    setPhase('check_resume')
+    setStatus('thinking')
 
-function getModeLabel(mode: ResumeMode): string {
-    switch (mode) {
-        case 'ats_check':
-            return 'Проверка ATS'
-        case 'improve_experience':
-            return 'Улучшить опыт'
-        case 'keywords':
-            return 'Ключевые слова'
-        case 'formatting':
-            return 'Форматирование'
-    }
+    await runStream(
+      sendResumeMessageStream({
+        checkId,
+        content,
+        signal: controller.signal,
+      }),
+      controller,
+    )
+  }
+
+  async function refineAnswer() {
+    if (phase !== 'awaiting_next') return
+    setPhase('check_resume')
+  }
+
+  function reset() {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setPhase('idle')
+    setMode(null)
+    setMessages([])
+    setStatus('idle')
+    setError('')
+    setThought('')
+    setProgress(0)
+    setCheckId(null)
+  }
+
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  return {
+    phase,
+    mode,
+    messages,
+    status,
+    error,
+    thought,
+    progress,
+    checkId,
+    chooseAtsCheck,
+    chooseImproveExperience,
+    chooseKeywords,
+    chooseFormatting,
+    startResumeCheck,
+    sendUserMessage,
+    refineAnswer,
+    reset,
+  }
 }

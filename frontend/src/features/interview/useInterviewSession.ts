@@ -18,22 +18,35 @@ function uid() {
 }
 
 export function useInterviewSession(chatId?: string | null) {
-	const [phase, setPhase] = useState<InterviewPhase>('idle')
-	const [mode, setMode] = useState<InterviewMode | null>(null)
-	const [vacancy, setVacancy] = useState<VacancyContext | null>(null)
-	const [messages, setMessages] = useState<ChatMessage[]>([])
+	const [initialSnapshot] = useState(() => (chatId ? getChat(chatId) : null))
+
+	const [phase, setPhase] = useState<InterviewPhase>(
+		initialSnapshot?.phase ?? 'idle',
+	)
+	const [mode, setMode] = useState<InterviewMode | null>(
+		initialSnapshot?.mode ?? null,
+	)
+	const [vacancy, setVacancy] = useState<VacancyContext | null>(
+		initialSnapshot?.vacancy ?? null,
+	)
+	const [messages, setMessages] = useState<ChatMessage[]>(
+		initialSnapshot?.messages ?? [],
+	)
 	const [status, setStatus] = useState<'idle' | 'thinking' | 'streaming' | 'error'>(
 		'idle',
 	)
 	const [error, setError] = useState('')
 	const [thought, setThought] = useState('')
-	const [progress, setProgress] = useState(0)
+	const [progress, setProgress] = useState(initialSnapshot?.progress ?? 0)
 	const abortRef = useRef<AbortController | null>(null)
 
-	const [currentChatId, setCurrentChatId] = useState<string | null>(chatId ?? null)
-	const [createdAtRef, setCreatedAtRef] = useState<number>(Date.now())
-	const [isLoaded, setIsLoaded] = useState(false)
-	const prevChatIdRef = useRef<string | null | undefined>(chatId)
+	const [currentChatId, setCurrentChatId] = useState<string | null>(
+		initialSnapshot?.id ?? null,
+	)
+	const [createdAtRef, setCreatedAtRef] = useState<number>(
+		initialSnapshot?.createdAt ?? Date.now(),
+	)
+	const isLoaded = true
 
 	function chooseVacancyPrep() {
 		setMode('vacancy')
@@ -236,44 +249,9 @@ export function useInterviewSession(chatId?: string | null) {
 		reset()
 	}
 
-	// Загрузка чата при смене chatId
-	useEffect(() => {
-		const prevChatId = prevChatIdRef.current
-
-		if (!chatId) {
-			// Переход на "новый чат" — если раньше был активный чат, сбрасываем
-			if (prevChatId != null) {
-				reset()
-			}
-			setCurrentChatId(null)
-			setIsLoaded(true)
-			prevChatIdRef.current = chatId
-			return
-		}
-
-		// Загрузка конкретного чата
-		const snapshot = getChat(chatId)
-		if (snapshot) {
-			setMode(snapshot.mode)
-			setPhase(snapshot.phase === 'idle' ? 'idle' : snapshot.phase)
-			setVacancy(snapshot.vacancy)
-			setMessages(snapshot.messages)
-			setProgress(snapshot.progress)
-			setCurrentChatId(snapshot.id)
-			setCreatedAtRef(snapshot.createdAt)
-		} else {
-			if (prevChatId != null) {
-				reset()
-			}
-			setCurrentChatId(null)
-		}
-		setIsLoaded(true)
-		prevChatIdRef.current = chatId
-	}, [chatId])
-
 	// Авто-сохранение при изменении состояния
 	useEffect(() => {
-		if (!currentChatId || !isLoaded) return
+		if (!currentChatId) return
 		if (phase === 'idle' && messages.length === 0) return
 
 		const snapshot = {
@@ -295,7 +273,6 @@ export function useInterviewSession(chatId?: string | null) {
 		vacancy,
 		messages,
 		progress,
-		isLoaded,
 		createdAtRef,
 	])
 

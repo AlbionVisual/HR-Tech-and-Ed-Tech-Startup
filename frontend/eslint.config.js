@@ -19,4 +19,11 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // В ambient-декларациях (`declare var`) правило no-var неприменимо.
+    files: ['**/*.d.ts'],
+    rules: {
+      'no-var': 'off',
+    },
+  },
 ])
