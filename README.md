@@ -54,6 +54,12 @@ CORS не нужен.
 
 - `POST /api/v1/ai/chat/stream` — SSE-стрим интервью.
 - `GET /api/v1/ai/models` — доступные провайдеры и модели.
+- `POST /api/v1/interviews:stream` — старт интервью.
+- `POST /api/v1/interviews/{id}/messages:stream` — сообщение в интервью.
+- `POST /api/v1/interviews/{id}/next-question:stream` — следующий вопрос.
+- `GET /api/v1/interviews` — список чатов интервью.
+- `DELETE /api/v1/interviews/{id}` — удалить чат.
+- `DELETE /api/v1/interviews` — очистить все чаты.
 - `POST /api/v1/resumes/extract` — извлечение текста из PDF/DOCX.
 - `POST /api/v1/resumes/checks:stream` — старт анализа резюме.
 - `POST /api/v1/resumes/checks/{id}/messages:stream` — продолжение анализа.
@@ -70,19 +76,3 @@ npm run lint
 npm run build
 ```
 
-## Статус
-
-Сделано:
-
-- AI-провайдеры и промпты на backend;
-- анализ резюме: текст, PDF/DOCX, SSE, история;
-- каталог моделей из backend;
-- загрузка резюме на frontend.
-
-В планах:
-
-- авторизация и проверка владельца данных;
-- PostgreSQL и миграции;
-- перенос интервью и тестов на backend;
-- TTS через backend;
-- Docker, CI/CD и деплой на VPS.

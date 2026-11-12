@@ -13,12 +13,26 @@ export function InterviewPage({ chatId }: Props) {
 	const inChat =
 		session.phase === 'interviewing' || session.phase === 'awaiting_next'
 
+	if (session.isLoading) {
+		return (
+			<div className="grid h-full place-items-center p-6 text-sm text-muted">
+				Загружаю чат…
+			</div>
+		)
+	}
+
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 
 		<div className="w-full max-w-xl mx-auto px-4">
 				{inChat ? <InterviewProgress value={session.progress} /> : null}
 			</div>
+
+			{session.error && session.phase === 'idle' ? (
+				<p className="mx-auto w-full max-w-xl px-4 text-sm text-danger">
+					{session.error}
+				</p>
+			) : null}
 
 			{session.phase === 'idle' || session.phase === 'vacancy_form' ? (
 				<InterviewStart

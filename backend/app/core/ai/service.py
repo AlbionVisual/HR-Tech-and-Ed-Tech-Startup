@@ -119,6 +119,12 @@ class AiChatService:
     async def probe(self, provider: str) -> dict:
         return await probe_gemini(self.settings, self.http, provider)
 
+    def resolve_provider_model(
+        self, provider: str | None, model: str | None
+    ) -> tuple[str, str]:
+        resolved_provider, resolved_model, _ = self._resolve(provider, model)
+        return resolved_provider, resolved_model
+
     def _resolve(
         self, requested_provider: str | None, requested_model: str | None
     ) -> tuple[str, str, str]:

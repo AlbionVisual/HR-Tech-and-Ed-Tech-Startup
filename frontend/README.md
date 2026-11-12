@@ -15,9 +15,6 @@ npm run dev
 Dev-сервер работает по HTTPS с самоподписанным сертификатом, чтобы работали
 микрофон и доступ с телефона по локальной сети.
 
-Vite проксирует `/api` на `http://127.0.0.1:8000`, поэтому backend должен быть
-запущен отдельно.
-
 ## Скрипты
 
 ```bash
@@ -32,6 +29,10 @@ npm run lint         # ESLint
 - `VITE_API_BASE_URL` — базовый URL backend. Пустое значение означает
   same-origin запросы через Vite proxy.
 - Каталог AI-моделей загружается из `GET /api/v1/ai/models`.
+- Интервью: `POST /api/v1/interviews:stream`,
+  `POST /api/v1/interviews/{id}/messages:stream`,
+  `POST /api/v1/interviews/{id}/next-question:stream`,
+  `GET /api/v1/interviews`.
 - Анализ резюме: `POST /api/v1/resumes/extract`,
   `POST /api/v1/resumes/checks:stream`,
   `POST /api/v1/resumes/checks/{id}/messages:stream`.

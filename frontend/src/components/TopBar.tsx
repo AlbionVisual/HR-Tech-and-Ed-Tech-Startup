@@ -13,6 +13,7 @@ export function TopBar({
 	title,
 	isSideMenuOpen,
 	onToggleSideMenu,
+	activeChatId,
 	onChatSelect,
 	onNewChat,
 }: Props) {
@@ -36,6 +37,7 @@ export function TopBar({
 				<SideMenu
 					isOpen={isSideMenuOpen}
 					onClose={onToggleSideMenu}
+					activeChatId={activeChatId}
 					onChatSelect={onChatSelect}
 					onNewChat={onNewChat}
 				/>

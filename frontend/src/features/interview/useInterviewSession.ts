@@ -1,302 +1,381 @@
 import { useEffect, useRef, useState } from 'react'
-import { chatStream } from '../../ai/client'
+import {
+  getInterview,
+  nextInterviewQuestionStream,
+  sendInterviewMessageStream,
+  startInterviewStream,
+  type InterviewMessage,
+  type InterviewMode,
+  type InterviewSessionDetail,
+  type InterviewStreamEvent,
+} from '../../api/interviews'
+import { resolveSelection } from '../../ai/selection'
 import { typewriter } from '../../ai/stream/typewriter'
 import type { ChatMessage } from '../../ai/types'
 import { config, type VacancyContext, type VacancyGrade } from '../../config'
-import { saveChat, getChat, createChatRecord } from './chatStorage'
 
-export type InterviewMode = 'vacancy' | 'practice'
+export type { InterviewMode } from '../../api/interviews'
 
 export type InterviewPhase =
-	| 'idle'
-	| 'vacancy_form'
-	| 'interviewing'
-	| 'awaiting_next'
+  | 'idle'
+  | 'vacancy_form'
+  | 'interviewing'
+  | 'awaiting_next'
+
+type Status = 'idle' | 'thinking' | 'streaming' | 'error'
 
 function uid() {
-	return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function toChatMessage(message: InterviewMessage): ChatMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+  }
+}
+
+function applySession(
+  session: InterviewSessionDetail,
+  setters: {
+    setMode: (mode: InterviewMode) => void
+    setVacancy: (vacancy: VacancyContext | null) => void
+    setMessages: (messages: ChatMessage[]) => void
+    setProgress: (progress: number) => void
+    setPhase: (phase: InterviewPhase) => void
+    setCurrentSessionId: (id: string) => void
+  },
+) {
+  setters.setMode(session.mode)
+  setters.setVacancy(session.vacancy)
+  setters.setMessages(session.messages.map(toChatMessage))
+  setters.setProgress(session.progress)
+  setters.setPhase(session.phase)
+  setters.setCurrentSessionId(session.id)
 }
 
 export function useInterviewSession(chatId?: string | null) {
-	const [initialSnapshot] = useState(() => (chatId ? getChat(chatId) : null))
+  const [phase, setPhase] = useState<InterviewPhase>('idle')
+  const [mode, setMode] = useState<InterviewMode | null>(null)
+  const [vacancy, setVacancy] = useState<VacancyContext | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [status, setStatus] = useState<Status>('idle')
+  const [error, setError] = useState('')
+  const [thought, setThought] = useState('')
+  const [progress, setProgress] = useState(0)
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(
+    chatId ?? null,
+  )
+  const [isLoading, setIsLoading] = useState(Boolean(chatId))
+  const abortRef = useRef<AbortController | null>(null)
+  const loadRef = useRef(0)
 
-	const [phase, setPhase] = useState<InterviewPhase>(
-		initialSnapshot?.phase ?? 'idle',
-	)
-	const [mode, setMode] = useState<InterviewMode | null>(
-		initialSnapshot?.mode ?? null,
-	)
-	const [vacancy, setVacancy] = useState<VacancyContext | null>(
-		initialSnapshot?.vacancy ?? null,
-	)
-	const [messages, setMessages] = useState<ChatMessage[]>(
-		initialSnapshot?.messages ?? [],
-	)
-	const [status, setStatus] = useState<'idle' | 'thinking' | 'streaming' | 'error'>(
-		'idle',
-	)
-	const [error, setError] = useState('')
-	const [thought, setThought] = useState('')
-	const [progress, setProgress] = useState(initialSnapshot?.progress ?? 0)
-	const abortRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (!chatId) return
 
-	const [currentChatId, setCurrentChatId] = useState<string | null>(
-		initialSnapshot?.id ?? null,
-	)
-	const [createdAtRef, setCreatedAtRef] = useState<number>(
-		initialSnapshot?.createdAt ?? Date.now(),
-	)
-	const isLoaded = true
+    const requestId = ++loadRef.current
+    void (async () => {
+      try {
+        const session = await getInterview(chatId)
+        if (requestId !== loadRef.current) return
+        applySession(session, {
+          setMode,
+          setVacancy,
+          setMessages,
+          setProgress,
+          setPhase,
+          setCurrentSessionId,
+        })
+        setIsLoading(false)
+      } catch (loadError) {
+        if (requestId !== loadRef.current) return
+        setStatus('error')
+        setError(
+          loadError instanceof Error ? loadError.message : 'Не удалось загрузить чат',
+        )
+        setIsLoading(false)
+      }
+    })()
 
-	function chooseVacancyPrep() {
-		setMode('vacancy')
-		setPhase('vacancy_form')
-	}
+    return () => {
+      loadRef.current += 1
+      abortRef.current?.abort()
+    }
+  }, [chatId])
 
-	function choosePractice() {
-		setMode('practice')
-		setVacancy(null)
-		void startInterview('practice', null)
-	}
+  useEffect(() => () => abortRef.current?.abort(), [])
 
-	function closeVacancyForm() {
-		setPhase('idle')
-		setMode(null)
-	}
+  function chooseVacancyPrep() {
+    setMode('vacancy')
+    setPhase('vacancy_form')
+  }
 
-	async function startInterview(
-		nextMode: InterviewMode,
-		nextVacancy: VacancyContext | null,
-	) {
-		setMode(nextMode)
-		setVacancy(nextVacancy)
+  function choosePractice() {
+    setMode('practice')
+    setVacancy(null)
+    void startInterview('practice', null)
+  }
 
-		// Создаём новую запись чата в localStorage
-		const chat = createChatRecord(nextMode, nextVacancy)
-		setCurrentChatId(chat.id)
-		setCreatedAtRef(chat.createdAt)
+  function closeVacancyForm() {
+    setPhase('idle')
+    setMode(null)
+  }
 
-		setMessages([])
-		setError('')
-		setThought('')
-		setProgress(0)
-		setPhase('interviewing')
-		await runAssistantTurn([], { mode: nextMode, vacancy: nextVacancy })
-	}
+  async function consumeStream(
+    events: AsyncIterable<InterviewStreamEvent>,
+    controller: AbortController,
+    localUserId?: string,
+  ) {
+    const assistantId = uid()
+    let assembled = ''
+    let created = false
+    let sawFeedback = false
 
-	async function submitVacancy(form: {
-		company: string
-		grade: VacancyGrade
-		description: string
-	}) {
-		await startInterview('vacancy', form)
-	}
+    for await (const event of events) {
+      if (controller.signal.aborted) return
 
-	async function runAssistantTurn(
-		history: { role: 'user' | 'assistant'; content: string }[],
-		context?: { mode: InterviewMode; vacancy: VacancyContext | null },
-	) {
-		abortRef.current?.abort()
-		const controller = new AbortController()
-		abortRef.current = controller
+      if (event.type === 'meta') {
+        setCurrentSessionId(event.interview_id)
+        if (localUserId && event.user_message_id) {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === localUserId
+                ? { ...message, id: event.user_message_id as string }
+                : message,
+            ),
+          )
+        }
+        continue
+      }
+      if (event.type === 'thinking') {
+        setStatus('thinking')
+        continue
+      }
+      if (event.type === 'thought') {
+        setStatus('thinking')
+        setThought((prev) => prev + event.text)
+        continue
+      }
+      if (event.type === 'progress') {
+        setProgress(event.value)
+        continue
+      }
+      if (event.type === 'feedback') {
+        sawFeedback = true
+        continue
+      }
+      if (event.type === 'error') {
+        setStatus('error')
+        setError(event.message)
+        return
+      }
+      if (event.type === 'delta') {
+        if (!created) {
+          created = true
+          setMessages((prev) => [
+            ...prev,
+            { id: assistantId, role: 'assistant', content: '' },
+          ])
+        }
+        setStatus('streaming')
 
-		setStatus('thinking')
-		setError('')
-		setThought('')
+        for await (const piece of typewriter(event.text, config.ai.typewriter)) {
+          if (controller.signal.aborted) return
+          assembled += piece
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: assembled }
+                : message,
+            ),
+          )
+        }
+        continue
+      }
+      if (event.type === 'done') {
+        if (!assembled.trim()) {
+          setStatus('error')
+          setError('Модель вернула пустой ответ')
+          return
+        }
 
-		const assistantId = uid()
-		let assembled = ''
-		let created = false
-		let sawFeedback = false
-		const tw = config.ai.typewriter
-		const turnMode = context ? context.mode : mode ?? 'practice'
-		const turnVacancy = context ? context.vacancy : vacancy
+        const finalId = event.assistant_message_id || assistantId
+        const content = assembled.trim()
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId
+              ? { ...message, id: finalId, content }
+              : message,
+          ),
+        )
+        setPhase(
+          sawFeedback || event.phase === 'awaiting_next'
+            ? 'awaiting_next'
+            : 'interviewing',
+        )
+        setProgress(event.progress)
+        setStatus('idle')
+        return
+      }
+    }
+  }
 
-		try {
-			for await (const event of chatStream({
-				task: 'interview',
-				mode: turnMode,
-				vacancy: turnVacancy,
-				messages: history,
-				signal: controller.signal,
-			})) {
-				if (controller.signal.aborted) return
+  async function runStream(
+    events: AsyncIterable<InterviewStreamEvent>,
+    controller: AbortController,
+    localUserId?: string,
+  ) {
+    try {
+      await consumeStream(events, controller, localUserId)
+    } catch (streamError) {
+      if (controller.signal.aborted) return
+      setStatus('error')
+      setError(
+        streamError instanceof Error ? streamError.message : 'Ошибка интервью',
+      )
+    }
+  }
 
-				if (event.type === 'thinking') {
-					setStatus('thinking')
-					continue
-				}
-				if (event.type === 'thought') {
-					setStatus('thinking')
-					setThought((prev) => prev + event.text)
-					continue
-				}
-				if (event.type === 'progress') {
-					setProgress(event.value)
-					continue
-				}
-				if (event.type === 'feedback') {
-					sawFeedback = true
-					continue
-				}
-				if (event.type === 'error') {
-					setStatus('error')
-					setError(event.message)
-					return
-				}
-				if (event.type === 'delta') {
-					if (!created) {
-						created = true
-						setMessages((prev) => [
-							...prev,
-							{ id: assistantId, role: 'assistant', content: '' },
-						])
-					}
-					setStatus('streaming')
+  async function startInterview(
+    nextMode: InterviewMode,
+    nextVacancy: VacancyContext | null,
+  ) {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
 
-					for await (const piece of typewriter(event.text, tw)) {
-						if (controller.signal.aborted) return
-						assembled += piece
-						setMessages((prev) =>
-							prev.map((m) =>
-								m.id === assistantId ? { ...m, content: assembled } : m,
-							),
-						)
-					}
-					continue
-				}
-				if (event.type === 'done') {
-					if (!assembled.trim()) {
-						setStatus('error')
-						setError('Модель вернула пустой ответ')
-						return
-					}
-					const content = assembled.trim()
-					setMessages((prev) => {
-						const exists = prev.some((m) => m.id === assistantId)
-						if (!exists) {
-							return [
-								...prev,
-								{
-									id: assistantId,
-									role: 'assistant',
-									content,
-								},
-							]
-						}
-						return prev.map((m) =>
-							m.id === assistantId ? { ...m, content } : m,
-						)
-					})
-					setPhase(sawFeedback ? 'awaiting_next' : 'interviewing')
-					setStatus('idle')
-				}
-			}
-		} catch (e) {
-			if (controller.signal.aborted) return
-			setStatus('error')
-			setError(e instanceof Error ? e.message : 'Ошибка запроса')
-		}
-	}
+    setMode(nextMode)
+    setVacancy(nextVacancy)
+    setMessages([])
+    setCurrentSessionId(null)
+    setError('')
+    setThought('')
+    setProgress(0)
+    setPhase('interviewing')
+    setStatus('thinking')
 
-	async function sendUserMessage(text: string) {
-		const content = text.trim()
-		if (!content || status === 'thinking' || status === 'streaming') return
-		if (phase !== 'interviewing') return
+    const selected = resolveSelection()
+    await runStream(
+      startInterviewStream({
+        mode: nextMode,
+        vacancy: nextVacancy,
+        provider: selected.provider,
+        model: selected.model || undefined,
+        signal: controller.signal,
+      }),
+      controller,
+    )
+  }
 
-		const userMessage: ChatMessage = { id: uid(), role: 'user', content }
-		const next = [...messages, userMessage]
-		setMessages(next)
-		setPhase('interviewing')
+  async function submitVacancy(form: {
+    company: string
+    grade: VacancyGrade
+    description: string
+  }) {
+    await startInterview('vacancy', form)
+  }
 
-		await runAssistantTurn(
-			next.map((m) => ({ role: m.role, content: m.content })),
-		)
-	}
+  async function sendUserMessage(text: string) {
+    const content = text.trim()
+    if (!content || status === 'thinking' || status === 'streaming') return
+    if (phase !== 'interviewing') return
+    if (!currentSessionId) {
+      setStatus('error')
+      setError('Интервью ещё не создано')
+      return
+    }
 
-	async function refineAnswer() {
-		if (phase !== 'awaiting_next') return
-		setPhase('interviewing')
-	}
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
 
-	async function nextQuestion() {
-		if (phase !== 'awaiting_next') return
-		setPhase('interviewing')
-		const prompt =
-			'Задай следующий основной вопрос интервью. Не повторяй предыдущий.'
-		const history = [
-			...messages.map((m) => ({ role: m.role, content: m.content })),
-			{ role: 'user' as const, content: prompt },
-		]
-		await runAssistantTurn(history)
-	}
+    const localUserId = uid()
+    setMessages((prev) => [
+      ...prev,
+      { id: localUserId, role: 'user', content },
+    ])
+    setError('')
+    setThought('')
+    setPhase('interviewing')
+    setStatus('thinking')
 
-	function reset() {
-		abortRef.current?.abort()
-		abortRef.current = null
-		setPhase('idle')
-		setMode(null)
-		setVacancy(null)
-		setMessages([])
-		setStatus('idle')
-		setError('')
-		setThought('')
-		setProgress(0)
-	}
+    await runStream(
+      sendInterviewMessageStream({
+        sessionId: currentSessionId,
+        content,
+        signal: controller.signal,
+      }),
+      controller,
+      localUserId,
+    )
+  }
 
-	function startNewChat() {
-		setCurrentChatId(null)
-		reset()
-	}
+  async function nextQuestion() {
+    if (phase !== 'awaiting_next' || !currentSessionId) return
 
-	// Авто-сохранение при изменении состояния
-	useEffect(() => {
-		if (!currentChatId) return
-		if (phase === 'idle' && messages.length === 0) return
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
 
-		const snapshot = {
-			id: currentChatId,
-			title: mode === 'practice' ? 'Тренировка' : `Вакансия: ${vacancy?.company ?? ''}`,
-			createdAt: createdAtRef,
-			updatedAt: Date.now(),
-			mode: mode ?? 'practice',
-			phase,
-			vacancy,
-			messages,
-			progress,
-		}
-		saveChat(snapshot)
-	}, [
-		currentChatId,
-		phase,
-		mode,
-		vacancy,
-		messages,
-		progress,
-		createdAtRef,
-	])
+    setError('')
+    setThought('')
+    setPhase('interviewing')
+    setStatus('thinking')
 
-	useEffect(() => () => abortRef.current?.abort(), [])
+    await runStream(
+      nextInterviewQuestionStream({
+        sessionId: currentSessionId,
+        signal: controller.signal,
+      }),
+      controller,
+    )
+  }
 
-	return {
-		phase,
-		mode,
-		vacancy,
-		messages,
-		status,
-		error,
-		thought,
-		progress,
-		chatId: currentChatId,
-		isLoaded,
-		chooseVacancyPrep,
-		choosePractice,
-		closeVacancyForm,
-		submitVacancy,
-		sendUserMessage,
-		refineAnswer,
-		nextQuestion,
-		reset,
-		startNewChat,
-	}
+  function refineAnswer() {
+    if (phase !== 'awaiting_next') return
+    setPhase('interviewing')
+  }
+
+  function reset() {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setPhase('idle')
+    setMode(null)
+    setVacancy(null)
+    setMessages([])
+    setStatus('idle')
+    setError('')
+    setThought('')
+    setProgress(0)
+    setCurrentSessionId(null)
+    setIsLoading(false)
+  }
+
+  function startNewChat() {
+    setCurrentSessionId(null)
+    reset()
+  }
+
+  return {
+    phase,
+    mode,
+    vacancy,
+    messages,
+    status,
+    error,
+    thought,
+    progress,
+    chatId: currentSessionId,
+    isLoading,
+    chooseVacancyPrep,
+    choosePractice,
+    closeVacancyForm,
+    submitVacancy,
+    sendUserMessage,
+    refineAnswer,
+    nextQuestion,
+    reset,
+    startNewChat,
+  }
 }

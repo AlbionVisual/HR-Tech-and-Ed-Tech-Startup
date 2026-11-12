@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react'
 import {
-	deleteChat,
-	INTERVIEW_CHATS_EVENT,
-	listChats,
-	type ChatMeta,
-} from '../features/interview/chatStorage'
+	clearInterviews,
+	deleteInterview,
+	listInterviews,
+	type InterviewSessionSummary,
+} from '../api/interviews'
 import { ModelSelect } from './ModelSelect'
-// import { TtsSelect } from './TtsSelect'
-// import { TtsVoiceSelect } from './TtsVoiceSelect'
-// import { VoiceToggle } from './VoiceToggle'
 
 type SideMenuProps = {
 	isOpen: boolean
 	onClose: () => void
+	activeChatId?: string | null
 	onChatSelect: (id: string) => void
 	onNewChat: () => void
 }
@@ -20,19 +18,37 @@ type SideMenuProps = {
 export function SideMenu({
 	isOpen,
 	onClose,
+	activeChatId,
 	onChatSelect,
 	onNewChat,
 }: SideMenuProps) {
-	const [chats, setChats] = useState<ChatMeta[]>([])
+	const [chats, setChats] = useState<InterviewSessionSummary[]>([])
+	const [error, setError] = useState('')
 
 	useEffect(() => {
-		function sync() {
-			setChats(listChats())
+		if (!isOpen) return
+
+		let cancelled = false
+		void (async () => {
+			try {
+				const data = await listInterviews()
+				if (cancelled) return
+				setChats(data)
+				setError('')
+			} catch (loadError) {
+				if (cancelled) return
+				setError(
+					loadError instanceof Error
+						? loadError.message
+						: 'Не удалось загрузить чаты',
+				)
+			}
+		})()
+
+		return () => {
+			cancelled = true
 		}
-		sync()
-		window.addEventListener(INTERVIEW_CHATS_EVENT, sync)
-		return () => window.removeEventListener(INTERVIEW_CHATS_EVENT, sync)
-	}, [])
+	}, [isOpen])
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,8 +62,8 @@ export function SideMenu({
 
 	if (!isOpen) return null
 
-	function formatTime(ts: number): string {
-		const d = new Date(ts)
+	function formatTime(iso: string): string {
+		const d = new Date(iso)
 		const now = new Date()
 		const diff = now.getTime() - d.getTime()
 		if (diff < 60_000) return 'только что'
@@ -55,6 +71,30 @@ export function SideMenu({
 		if (diff < 86_400_000)
 			return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 		return d.toLocaleDateString()
+	}
+
+	async function removeChat(id: string) {
+		try {
+			await deleteInterview(id)
+			setChats((prev) => prev.filter((chat) => chat.id !== id))
+			if (activeChatId === id) onNewChat()
+		} catch (deleteError) {
+			setError(
+				deleteError instanceof Error ? deleteError.message : 'Не удалось удалить чат',
+			)
+		}
+	}
+
+	async function removeAll() {
+		try {
+			await clearInterviews()
+			setChats([])
+			onNewChat()
+		} catch (deleteError) {
+			setError(
+				deleteError instanceof Error ? deleteError.message : 'Не удалось удалить чаты',
+			)
+		}
 	}
 
 	return (
@@ -84,20 +124,6 @@ export function SideMenu({
 							<span>Модель чата</span>
 							<ModelSelect variant="panel" />
 						</label>
-						{/* Озвучка временно скрыта
-						<div className="flex items-center justify-between gap-2">
-							<span className="text-[0.75rem] text-muted">Озвучка</span>
-							<VoiceToggle />
-						</div>
-						<label className="grid gap-1 text-[0.75rem] text-muted">
-							<span>Модель озвучки</span>
-							<TtsSelect variant="panel" />
-						</label>
-						<label className="grid gap-1 text-[0.75rem] text-muted">
-							<span>Голос</span>
-							<TtsVoiceSelect variant="panel" />
-						</label>
-						*/}
 					</div>
 				</section>
 
@@ -114,16 +140,22 @@ export function SideMenu({
 					</button>
 				</div>
 
+				{error ? (
+					<p className="m-0 pb-2 text-sm text-danger">{error}</p>
+				) : null}
+
 				<div className="flex-1 overflow-y-auto">
 					{chats.length === 0 ? (
 						<p className="text-sm text-ink/70">Пока нет сохранённых чатов</p>
 					) : (
 						<ul className="space-y-1">
 							{chats.map((chat) => (
-								<li key={chat.id}>
+								<li key={chat.id} className="flex items-start gap-1">
 									<button
 										type="button"
-										className="flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-elevated"
+										className={`flex min-w-0 flex-1 flex-col items-start gap-1 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-elevated ${
+											activeChatId === chat.id ? 'bg-bg-elevated' : ''
+										}`}
 										onClick={() => {
 											onChatSelect(chat.id)
 											onClose()
@@ -132,16 +164,24 @@ export function SideMenu({
 										<span className="w-full truncate text-sm font-medium text-ink">
 											{chat.title || 'Без названия'}
 										</span>
-										{chat.lastMessage ? (
+										{chat.last_message ? (
 											<span className="w-full truncate text-xs text-ink/60">
-												{chat.lastMessage.length > 60
-													? `${chat.lastMessage.slice(0, 60)}…`
-													: chat.lastMessage}
+												{chat.last_message.length > 60
+													? `${chat.last_message.slice(0, 60)}…`
+													: chat.last_message}
 											</span>
 										) : null}
 										<span className="text-xs text-ink/40">
-											{formatTime(chat.updatedAt)}
+											{formatTime(chat.updated_at)}
 										</span>
+									</button>
+									<button
+										type="button"
+										className="shrink-0 rounded-lg p-2 text-xs text-muted transition-colors hover:bg-bg-elevated hover:text-danger"
+										aria-label="Удалить чат"
+										onClick={() => void removeChat(chat.id)}
+									>
+										✕
 									</button>
 								</li>
 							))}
@@ -154,10 +194,7 @@ export function SideMenu({
 						<button
 							type="button"
 							className="w-full rounded-lg px-3 py-2 text-sm text-danger transition-colors hover:bg-bg-elevated"
-							onClick={() => {
-								chats.forEach((c) => deleteChat(c.id))
-								setChats([])
-							}}
+							onClick={() => void removeAll()}
 						>
 							Очистить все
 						</button>

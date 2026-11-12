@@ -8,27 +8,23 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ResumePage } from "./pages/ResumePage";
 import { TestsPage } from "./pages/TestsPage";
 import { VoiceProvider } from "./speech/VoiceContext";
-import { getLastChatId, setLastChatId } from "./features/interview/chatStorage";
 import type { ProfileUser } from "./features/profile/types";
 
 function App() {
   const [page, setPage] = useState<PageId>(config.app.defaultPage);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
-  // Восстанавливаем последний выбранный чат из localStorage
-  const [activeChatId, setActiveChatId] = useState<string | null>(() =>
-    getLastChatId(),
-  );
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [newChatNonce, setNewChatNonce] = useState(0);
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
 
   const handleChatSelect = (id: string) => {
     setActiveChatId(id);
-    setLastChatId(id);
     setIsSideMenuOpen(false);
   };
 
   const handleNewChat = () => {
     setActiveChatId(null);
-    setLastChatId(null);
+    setNewChatNonce((value) => value + 1);
     setIsSideMenuOpen(false);
   };
 
@@ -65,7 +61,10 @@ function App() {
             <ResumePage />
           : null}
           {page === "interview" ?
-            <InterviewPage key={activeChatId ?? "new"} chatId={activeChatId} />
+            <InterviewPage
+              key={`${activeChatId ?? "new"}-${newChatNonce}`}
+              chatId={activeChatId}
+            />
           : null}
           {isProfile ?
             <ProfilePage

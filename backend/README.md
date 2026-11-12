@@ -24,25 +24,6 @@ uv run uvicorn app.main:app --reload --port 8000
 - http://localhost:8000/health
 - http://localhost:8000/api/v1/ai/models
 
-## Переменные окружения
-
-```env
-APP_NAME=HR/Ed Tech API
-ENVIRONMENT=local
-API_V1_PREFIX=/api/v1
-
-GEMINI_API_KEY=
-OPENROUTER_API_KEY=
-AIAI_API_KEY=
-
-AI_DEFAULT_PROVIDER=openrouter
-AI_CORS_ORIGINS=http://localhost:5273,https://albionvisual.github.io
-AI_TIMEOUT_SECONDS=120
-AI_MAX_MESSAGES=100
-AI_MAX_MESSAGE_CHARS=50000
-```
-
-## API
 
 ### AI
 
@@ -59,8 +40,15 @@ AI_MAX_MESSAGE_CHARS=50000
 - `GET /api/v1/resumes/checks/{id}` — проверка с сообщениями.
 - `DELETE /api/v1/resumes/checks/{id}` — удалить проверку.
 
-SSE-события: `meta`, `thinking`, `thought`, `delta`, `progress`, `feedback`,
-`done`, `error`.
+### Интервью
+
+- `POST /api/v1/interviews:stream` — создать чат и получить первый вопрос.
+- `POST /api/v1/interviews/{id}/messages:stream` — ответ пользователя.
+- `POST /api/v1/interviews/{id}/next-question:stream` — следующий вопрос.
+- `GET /api/v1/interviews` — список чатов.
+- `GET /api/v1/interviews/{id}` — чат с сообщениями.
+- `DELETE /api/v1/interviews/{id}` — удалить чат.
+- `DELETE /api/v1/interviews` — очистить все чаты.
 
 ## Структура
 
@@ -73,7 +61,9 @@ backend/
 │   │   ├── config.py            # настройки из .env
 │   │   ├── deps.py              # временный demo user
 │   │   └── ai/                  # провайдеры, промпты, SSE
-│   └── modules/resumes/         # домен резюме, парсеры, repository
+│   └── modules/                 # домены: резюме, интервью
+│       ├── resumes/             # парсеры, repository, service
+│       └── interviews/          # sessions, messages, SSE
 ├── tests/
 ├── pyproject.toml
 └── uv.lock
