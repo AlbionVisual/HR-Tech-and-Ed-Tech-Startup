@@ -46,6 +46,7 @@ class MessagesSql:
             )
 
             msgs.append(message.model_dump(mode="json"))
+            row.payload["updated_at"] = datetime.now(timezone.utc).isoformat()
             flag_modified(row, "payload")
 
             return message

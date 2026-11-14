@@ -20,11 +20,16 @@ class Database:
     async def start(self) -> None:
         if self._engine is not None:
             return
-        self._engine = create_async_engine(
-            self._settings.database_url,
-            pool_size=self._settings.database_pool_size,
-            echo=self._settings.database_echo,
-        )
+
+        url = self._settings.database_url
+        kwargs = {
+            "echo": self._settings.database_echo,
+            "pool_pre_ping": True,
+        }
+        if not url.startswith("sqlite"):
+            kwargs["pool_size"] = self._settings.database_pool_size
+
+        self._engine = create_async_engine(url, **kwargs)
         self._session_factory = async_sessionmaker(
             self._engine, expire_on_commit=False
         )

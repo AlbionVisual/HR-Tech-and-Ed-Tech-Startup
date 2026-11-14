@@ -48,13 +48,14 @@ class SessionsSql:
     async def list_sessions(self, user_id: UUID) -> list[InterviewSession]:
         async with self._db.session() as session:
             rows = await session.scalars(
-                select(InterviewTest).where(
-                    InterviewTest.user_id == user_id,
-                    InterviewTest.payload["deleted_at"].astext == None
-                )
+                select(InterviewTest).where(InterviewTest.user_id == user_id)
             )
-
-            return [self._to_schema(r) for r in rows if not r.payload.get("deleted_at")]
+            sessions = [
+                self._to_schema(row)
+                for row in rows
+                if not (row.payload or {}).get("deleted_at")
+            ]
+            return sorted(sessions, key=lambda item: item.updated_at, reverse=True)
 
     async def update_session(self, session_id: UUID, *, phase: str, progress: int | None = None) -> InterviewSession:
         async with self._db.session() as session:
@@ -73,18 +74,25 @@ class SessionsSql:
             row = await session.get(InterviewTest, session_id)
             if row is None or row.user_id != user_id:
                 return False
-            row.payload["deleted_at"] = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(timezone.utc).isoformat()
+            row.payload["deleted_at"] = now
+            row.payload["updated_at"] = now
+            flag_modified(row, "payload")
             return True
 
     async def soft_delete_all(self, user_id: UUID) -> int:
         async with self._db.session() as session:
-            rows = await session.scalars(select(InterviewTest).where(InterviewTest.user_id == user_id))
+            rows = await session.scalars(
+                select(InterviewTest).where(InterviewTest.user_id == user_id)
+            )
             count = 0
             now = datetime.now(timezone.utc).isoformat()
             for row in rows:
                 if row.payload.get("deleted_at"):
                     continue
                 row.payload["deleted_at"] = now
+                row.payload["updated_at"] = now
+                flag_modified(row, "payload")
                 count += 1
             return count
 

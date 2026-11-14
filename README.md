@@ -7,7 +7,7 @@ MVP-тренажёр для подготовки к собеседованиям
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS.
 - **Backend:** Python 3.12+, FastAPI, Uvicorn, uv.
-- **Хранение:** пока in-memory; PostgreSQL в планах.
+- **Хранение:** PostgreSQL 16, SQLAlchemy async.
 
 ## Структура
 
@@ -27,11 +27,17 @@ MVP-тренажёр для подготовки к собеседованиям
 cd backend
 cp .env.example .env
 uv sync
+
+# PostgreSQL для локальной разработки
+cd ..
+docker compose up -d db
+cd backend
+
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-В `backend/.env` можно указать ключи AI-провайдеров. Без ключей доступен
-демо-провайдер `mock`.
+В `backend/.env` можно указать ключи AI-провайдеров и `DATABASE_URL`.
+По умолчанию используется `postgresql+asyncpg://postgres:postgres@localhost:5432/hrtech`.
 
 - Swagger: http://localhost:8000/docs
 - Health: http://localhost:8000/health
@@ -60,6 +66,10 @@ CORS не нужен.
 - `GET /api/v1/interviews` — список чатов интервью.
 - `DELETE /api/v1/interviews/{id}` — удалить чат.
 - `DELETE /api/v1/interviews` — очистить все чаты.
+- `GET /api/v1/tests/languages` — языки тестов.
+- `POST /api/v1/tests/attempts` — начать тест.
+- `POST /api/v1/tests/attempts/{id}/answers` — ответить на вопрос.
+- `POST /api/v1/tests/attempts/{id}/finish` — завершить тест.
 - `POST /api/v1/resumes/extract` — извлечение текста из PDF/DOCX.
 - `POST /api/v1/resumes/checks:stream` — старт анализа резюме.
 - `POST /api/v1/resumes/checks/{id}/messages:stream` — продолжение анализа.
@@ -75,4 +85,7 @@ cd frontend
 npm run lint
 npm run build
 ```
+
+Тесты по умолчанию используют SQLite in-memory. Для проверки на PostgreSQL
+задайте `TEST_DATABASE_URL` (в CI используется PostgreSQL service).
 

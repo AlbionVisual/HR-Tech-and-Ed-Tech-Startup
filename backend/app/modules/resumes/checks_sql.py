@@ -61,9 +61,12 @@ class ChecksSql:
             rows = await session.scalars(
                 select(ResumeTest).where(ResumeTest.user_id == user_id)
             )
-            return [
-                self._to_schema(r) for r in rows if not r.result.get("deleted_at")
+            checks = [
+                self._to_schema(r)
+                for r in rows
+                if not (r.result or {}).get("deleted_at")
             ]
+            return sorted(checks, key=lambda item: item.updated_at, reverse=True)
 
     async def add_message(
         self,
@@ -106,6 +109,13 @@ class ChecksSql:
             raw = row.result.get("messages", [])
             return [ResumeMessage(**m) for m in raw]
 
+    async def count_messages(self, check_id: UUID) -> int:
+        async with self._db.session() as session:
+            row = await session.get(ResumeTest, check_id)
+            if row is None:
+                return 0
+            return len(row.result.get("messages", []))
+
     async def update_check(self, check_id: UUID, *, status: str, progress: int | None = None) -> ResumeCheck:
         async with self._db.session() as session:
             row = await session.get(ResumeTest, check_id)
@@ -123,7 +133,9 @@ class ChecksSql:
             row = await session.get(ResumeTest, check_id)
             if row is None or row.user_id != user_id:
                 return False
-            row.result["deleted_at"] = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(timezone.utc).isoformat()
+            row.result["deleted_at"] = now
+            row.result["updated_at"] = now
             flag_modified(row, "result")
             return True
 

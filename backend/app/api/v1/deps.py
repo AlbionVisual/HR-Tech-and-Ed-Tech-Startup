@@ -10,6 +10,7 @@ from app.modules.interviews.service import InterviewService
 from app.modules.resumes.ai import ResumeAi
 from app.modules.resumes.repository_sql import SqlResumeRepository
 from app.modules.resumes.service import ResumeService
+from app.modules.tests.service import TestService
 
 
 def get_ai_service(request: Request) -> AiChatService:
@@ -29,3 +30,7 @@ def get_resume_service(
     chat: AiChatService = Depends(get_ai_service),
 ) -> ResumeService:
     return ResumeService(SqlResumeRepository(database), ResumeAi(chat))
+
+
+def get_test_service() -> TestService:
+    return TestService(database)

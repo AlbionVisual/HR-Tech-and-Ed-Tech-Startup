@@ -8,6 +8,7 @@ from app.modules.interviews.service import (
 )
 from app.modules.resumes.service import ResumeNotFoundError
 from app.modules.resumes.validators import ResumeValidationError
+from app.modules.tests.service import TestNotFoundError, TestValidationError
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
@@ -39,5 +40,17 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(InterviewValidationError)
     async def interview_invalid(
         _: Request, exc: InterviewValidationError
+    ) -> JSONResponse:
+        return _error(exc.status_code, exc.code, exc.message)
+
+    @app.exception_handler(TestNotFoundError)
+    async def test_not_found(
+        _: Request, exc: TestNotFoundError
+    ) -> JSONResponse:
+        return _error(404, "not_found", str(exc))
+
+    @app.exception_handler(TestValidationError)
+    async def test_invalid(
+        _: Request, exc: TestValidationError
     ) -> JSONResponse:
         return _error(exc.status_code, exc.code, exc.message)

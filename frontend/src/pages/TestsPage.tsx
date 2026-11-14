@@ -1,103 +1,156 @@
-import { useState } from "react";
-import { TESTS_DATA, type Question } from "../features/tests/testsData";
+import { useEffect, useState } from "react";
+import {
+  answerTest,
+  finishTest,
+  getTestLanguages,
+  getTestStats,
+  startTest,
+  type TestAnswer,
+  type TestAttempt,
+  type TestLanguage,
+  type TestResult,
+} from "../api/tests";
 
 type Screen = "start" | "quiz" | "result" | "review";
 
-const INITIAL_LIVES = 5;
-
 export function TestsPage() {
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("Python");
+  const [languages, setLanguages] = useState<TestLanguage[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("python");
+  const [completedTestsCount, setCompletedTestsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [screen, setScreen] = useState<Screen>("start");
+  const [error, setError] = useState("");
 
-  const [currentTestQuestions, setCurrentTestQuestions] = useState<Question[]>([]);
+  const [attempt, setAttempt] = useState<TestAttempt | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isChecked, setIsChecked] = useState(false);
-  const [lives, setLives] = useState(INITIAL_LIVES);
+  const [answer, setAnswer] = useState<TestAnswer | null>(null);
+  const [result, setResult] = useState<TestResult | null>(null);
 
-  const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
+  const currentQuestion = attempt?.questions[currentIndex];
+  const lives = attempt?.lives ?? 0;
+  const isChecked = answer !== null;
+  const isGameOver = lives === 0;
+  const isLastQuestion = attempt
+    ? currentIndex + 1 === attempt.questions.length
+    : false;
+  const languageTitle =
+    languages.find((language) => language.slug === selectedLanguage)?.title ??
+    selectedLanguage;
+  const wrongQuestions = result?.wrong_questions ?? [];
 
-  const currentQuestion = currentTestQuestions[currentIndex];
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [languageData, stats] = await Promise.all([
+          getTestLanguages(),
+          getTestStats(),
+        ]);
+        if (cancelled) return;
+        setLanguages(languageData);
+        setCompletedTestsCount(stats.completed_count);
+        if (languageData.length) {
+          setSelectedLanguage(languageData[0].slug);
+        }
+      } catch (loadError) {
+        if (cancelled) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Не удалось загрузить тесты",
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const [completedTestsCount, setCompletedTestsCount] = useState<number>(() => {
-    const saved = localStorage.getItem("completed_tests_count");
-    return saved ? Number(saved) : 0;
-});
-
-  const handleStart = () => {
-    const languageTests = TESTS_DATA[selectedLanguage] || TESTS_DATA["Python"];
-
-    const randomTestIndex = Math.floor(Math.random() * languageTests.length);
-    const chosenQuestions = languageTests[randomTestIndex];
-
-    setCurrentTestQuestions(chosenQuestions);
-    setCurrentIndex(0);
-    setSelectedOption(null);
-    setIsChecked(false);
-    setLives(INITIAL_LIVES);
-    setUserAnswers({});
-    setScreen("quiz");
-  };
-
-  const handleCheck = () => {
-    if (selectedOption === null || !currentQuestion) return;
-    setIsChecked(true);
-
-    const isCorrect = selectedOption === currentQuestion.correctAnswer;
-
-    setUserAnswers((prev) => ({
-      ...prev,
-      [currentQuestion.id]: selectedOption,
-    }));
-
-    if (!isCorrect) {
-      setLives((prev) => Math.max(0, prev - 1));
-    }
-  };
-
-const handleNext = () => {
-    if (lives === 0) {
-      setIsChecked(false);
+  async function handleStart() {
+    if (starting) return;
+    setStarting(true);
+    setError("");
+    try {
+      const nextAttempt = await startTest(selectedLanguage);
+      setAttempt(nextAttempt);
+      setCurrentIndex(0);
       setSelectedOption(null);
-      setScreen("result");
+      setAnswer(null);
+      setResult(null);
+      setScreen("quiz");
+    } catch (startError) {
+      setError(
+        startError instanceof Error ? startError.message : "Не удалось начать тест",
+      );
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  async function handleCheck() {
+    if (selectedOption === null || !attempt || !currentQuestion || checking) {
       return;
     }
+    setChecking(true);
+    setError("");
+    try {
+      const nextAnswer = await answerTest(
+        attempt.attempt_id,
+        currentQuestion.id,
+        selectedOption,
+      );
+      setAnswer(nextAnswer);
+      setAttempt((prev) =>
+        prev ? { ...prev, lives: nextAnswer.lives } : prev,
+      );
+    } catch (checkError) {
+      setError(
+        checkError instanceof Error ? checkError.message : "Не удалось проверить ответ",
+      );
+    } finally {
+      setChecking(false);
+    }
+  }
 
-    if (currentIndex + 1 >= currentTestQuestions.length) {
-      setCompletedTestsCount((prev) => {
-        const nextCount = prev + 1;
-        localStorage.setItem("completed_tests_count", nextCount.toString());
-        return nextCount;
-      });
+  async function handleNext() {
+    if (!attempt || checking) return;
 
-      setIsChecked(false);
-      setSelectedOption(null);
-      setScreen("result");
+    if (isGameOver || isLastQuestion) {
+      setChecking(true);
+      setError("");
+      try {
+        const nextResult = await finishTest(attempt.attempt_id);
+        setResult(nextResult);
+        setScreen("result");
+        void getTestStats()
+          .then((stats) => setCompletedTestsCount(stats.completed_count))
+          .catch(() => undefined);
+      } catch (finishError) {
+        setError(
+          finishError instanceof Error
+            ? finishError.message
+            : "Не удалось завершить тест",
+        );
+      } finally {
+        setChecking(false);
+      }
       return;
     }
 
     setCurrentIndex((prev) => prev + 1);
     setSelectedOption(null);
-    setIsChecked(false);
-  };
-
-  const answeredQuestionIds = Object.keys(userAnswers).map(Number);
-  const correctCount = answeredQuestionIds.reduce((acc, qId) => {
-    const q = currentTestQuestions.find((item) => item.id === qId);
-    return q && userAnswers[qId] === q.correctAnswer ? acc + 1 : acc;
-  }, 0);
-
-  const wrongQuestions = currentTestQuestions.filter(
-    (q) =>
-      userAnswers[q.id] !== undefined && userAnswers[q.id] !== q.correctAnswer,
-  );
-
-  const isGameOver = lives === 0;
-  const isLastQuestion = currentIndex + 1 === currentTestQuestions.length;
-
+    setAnswer(null);
+  }
 
   return (
     <div className="mt-10 mx-auto w-full max-w-xl grid gap-4 p-4">
+      {error ? <p className="m-0 text-sm text-danger">{error}</p> : null}
+
       {screen === "start" && (
         <div className="grid gap-5 bg-[#70BFA1] p-6 rounded-3xl text-white shadow-lg">
           <div className="grid gap-1">
@@ -110,60 +163,52 @@ const handleNext = () => {
             </p>
           </div>
 
-            <div className="grid gap-1.5">
-              <div className="flex justify-between text-xs opacity-90 font-medium">
-                <span>Цель на день</span>
-                <span>{Math.min(completedTestsCount, 5)}/5</span>
-              </div>
-              <div className="h-2 w-full bg-black/20 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-white rounded-full transition-all duration-500 ease-out"
-                  style={{
-                    width: `${Math.min((completedTestsCount / 5) * 100, 100)}%`,
-                  }}
-                />
-              </div>
+          <div className="grid gap-1.5">
+            <div className="flex justify-between text-xs opacity-90 font-medium">
+              <span>Цель на день</span>
+              <span>{Math.min(completedTestsCount, 5)}/5</span>
             </div>
+            <div className="h-2 w-full bg-black/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${Math.min((completedTestsCount / 5) * 100, 100)}%`,
+                }}
+              />
+            </div>
+          </div>
 
           <section className="grid gap-3 pt-2">
             <span className="text-sm font-semibold opacity-90">
               Выбери язык
             </span>
             <div className="grid gap-2.5">
-              {Object.keys(TESTS_DATA).map((lang) => {
-                const active = selectedLanguage === lang;
+              {languages.map((lang) => {
+                const active = selectedLanguage === lang.slug;
                 return (
                   <button
-                    key={lang}
+                    key={lang.slug}
                     type="button"
                     className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer border-0 shadow-sm ${
-                      active ?
-                        "bg-white text-ink font-semibold"
-                      : "bg-emerald-700/60 text-white hover:bg-emerald-700/80"
+                      active
+                        ? "bg-white text-ink font-semibold"
+                        : "bg-emerald-700/60 text-white hover:bg-emerald-700/80"
                     }`}
-                    onClick={() => setSelectedLanguage(lang)}>
+                    onClick={() => setSelectedLanguage(lang.slug)}>
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">
-                        {lang === "Python" ?
-                          "🐍"
-                        : lang === "Java" ?
-                          "☕"
-                        : "⚙️"}
-                      </span>
+                      <span className="text-xl">{lang.icon}</span>
                       <div className="text-left">
-                        <div className="text-base font-bold">{lang}</div>
-                        {!active && (
-                          <div className="text-xs opacity-70">
-                            Новый
-                          </div>
-                        )}
+                        <div className="text-base font-bold">{lang.title}</div>
+                        <div className="text-xs opacity-70">
+                          {lang.tests_count} тестов
+                        </div>
                       </div>
                     </div>
                     <div
                       className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        active ?
-                          "border-ink bg-ink text-white"
-                        : "border-white/60"
+                        active
+                          ? "border-ink bg-ink text-white"
+                          : "border-white/60"
                       }`}>
                       {active && (
                         <div className="w-2 h-2 rounded-full bg-white" />
@@ -172,21 +217,27 @@ const handleNext = () => {
                   </button>
                 );
               })}
+              {!languages.length && !loading ? (
+                <p className="m-0 text-sm opacity-90">
+                  Тесты пока не загружены.
+                </p>
+              ) : null}
             </div>
           </section>
 
           <div className="pt-2">
             <button
               type="button"
-              className="w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-center transition-all shadow-md cursor-pointer border-0"
-              onClick={handleStart}>
-              Начать тест · {selectedLanguage}
+              className="w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-center transition-all shadow-md cursor-pointer border-0"
+              onClick={() => void handleStart()}
+              disabled={loading || starting || !languages.length}>
+              {starting ? "Загружаю тест…" : `Начать тест · ${languageTitle}`}
             </button>
           </div>
         </div>
       )}
 
-      {screen === "quiz" && currentQuestion && (
+      {screen === "quiz" && currentQuestion && attempt && (
         <div className="relative flex flex-col justify-between min-h-[580px] bg-[#f5f3ef] p-6 rounded-3xl text-ink shadow-md overflow-hidden">
           <div>
             <div className="flex items-center justify-between gap-3 mb-4">
@@ -201,7 +252,7 @@ const handleNext = () => {
                 <div
                   className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                   style={{
-                    width: `${((currentIndex + 1) / currentTestQuestions.length) * 100}%`,
+                    width: `${((currentIndex + 1) / attempt.questions.length) * 100}%`,
                   }}
                 />
               </div>
@@ -212,7 +263,7 @@ const handleNext = () => {
             </div>
 
             <div className="text-xs text-muted mb-1 font-medium">
-              Вопрос {currentIndex + 1} из {currentTestQuestions.length}
+              Вопрос {currentIndex + 1} из {attempt.questions.length}
             </div>
 
             <h3 className="m-0 text-xl font-bold mb-6 text-ink">
@@ -222,7 +273,7 @@ const handleNext = () => {
             <div className="grid gap-3">
               {currentQuestion.options.map((opt, idx) => {
                 const isSelected = selectedOption === idx;
-                const isCorrect = idx === currentQuestion.correctAnswer;
+                const isCorrect = isChecked && answer?.correct_index === idx;
 
                 let itemStyle =
                   "bg-white text-ink border-2 border-transparent shadow-sm hover:border-[#ede9e2]";
@@ -257,110 +308,101 @@ const handleNext = () => {
           </div>
 
           <div className="mt-6">
-            {!isChecked ?
+            {!isChecked ? (
               <button
                 type="button"
                 className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-center transition-all shadow-md cursor-pointer border-0"
-                disabled={selectedOption === null}
-                onClick={handleCheck}>
-                Проверить
+                disabled={selectedOption === null || checking}
+                onClick={() => void handleCheck()}>
+                {checking ? "Проверяю…" : "Проверить"}
               </button>
-            : <div
+            ) : (
+              <div
                 className={`-mx-6 -mb-6 p-6 rounded-b-3xl grid gap-3 transition-all ${
-                  selectedOption === currentQuestion.correctAnswer ?
-                    "bg-[#bde8d3]"
-                  : "bg-[#ffd3cc]"
+                  answer?.is_correct ? "bg-[#bde8d3]" : "bg-[#ffd3cc]"
                 }`}>
                 <div>
                   <h4
                     className={`m-0 text-lg font-bold ${
-                      selectedOption === currentQuestion.correctAnswer ?
-                        "text-emerald-900"
-                      : "text-red-900"
+                      answer?.is_correct ? "text-emerald-900" : "text-red-900"
                     }`}>
-                    {selectedOption === currentQuestion.correctAnswer ?
-                      "Верно!"
-                    : "Почти!"}
+                    {answer?.is_correct ? "Верно!" : "Почти!"}
                   </h4>
                   <p
                     className={`m-0 text-sm mt-0.5 ${
-                      selectedOption === currentQuestion.correctAnswer ?
-                        "text-emerald-800"
-                      : "text-red-800"
+                      answer?.is_correct ? "text-emerald-800" : "text-red-800"
                     }`}>
-                    {selectedOption === currentQuestion.correctAnswer ?
+                    {answer?.is_correct ? (
                       "Так держать."
-                    : <>
+                    ) : (
+                      <>
                         Правильный ответ:{" "}
-                        <strong>
-                          {
-                            currentQuestion.options[
-                              currentQuestion.correctAnswer
-                            ]
-                          }
-                        </strong>
-                        . Запомним и вернёмся.
+                        <strong>{answer?.correct_option}</strong>. Запомним и
+                        вернёмся.
                       </>
-                    }
+                    )}
                   </p>
                 </div>
 
                 <button
                   type="button"
                   className={`w-full py-4 rounded-2xl font-bold text-center text-white transition-all shadow-md cursor-pointer border-0 ${
-                    selectedOption === currentQuestion.correctAnswer ?
-                      "bg-emerald-500 hover:bg-emerald-600"
-                    : "bg-orange-500 hover:bg-orange-600"
+                    answer?.is_correct
+                      ? "bg-emerald-500 hover:bg-emerald-600"
+                      : "bg-orange-500 hover:bg-orange-600"
                   }`}
-                  onClick={handleNext}>
-                  {isGameOver ?
-                    "Завершить"
-                  : isLastQuestion ?
-                    "Посмотреть результат"
-                  : "Дальше"}
+                  disabled={checking}
+                  onClick={() => void handleNext()}>
+                  {checking
+                    ? "Завершаю…"
+                    : isGameOver
+                      ? "Завершить"
+                      : isLastQuestion
+                        ? "Посмотреть результат"
+                        : "Дальше"}
                 </button>
               </div>
-            }
+            )}
           </div>
         </div>
       )}
 
-      {screen === "result" && (
+      {screen === "result" && result && (
         <div className="relative flex flex-col justify-between min-h-[580px] bg-[#f5f3ef] p-6 rounded-3xl text-ink shadow-md text-center">
           <div className="pt-6">
             <span className="text-xs uppercase tracking-wider text-muted font-medium">
-              {selectedLanguage} · Junior
+              {result.language_title} · Junior
             </span>
 
             <div className="text-6xl font-bold text-emerald-600 my-4 tracking-tight">
-              {correctCount}/{currentTestQuestions.length}
+              {result.correct_count}/{result.total}
             </div>
 
             <h3 className="m-0 text-xl font-bold text-ink mb-2">
-              {correctCount >= currentTestQuestions.length * 0.7 ?
-                "Уверенный результат. Навыки соответствуют ожиданиям."
-              : "Требуется дополнительная подготовка по ряду тем."}
+              {result.correct_count >= result.total * 0.7
+                ? "Уверенный результат. Навыки соответствуют ожиданиям."
+                : "Требуется дополнительная подготовка по ряду тем."}
             </h3>
 
-            <p className="m-0 text-sm text-muted">Остаток жизней: ♥ {lives}</p>
+            <p className="m-0 text-sm text-muted">Остаток жизней: ♥ {result.lives}</p>
           </div>
 
           <div className="grid gap-3 pb-4">
             <button
               type="button"
               className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-center transition-all shadow-md cursor-pointer border-0"
-              onClick={handleStart}>
+              onClick={() => void handleStart()}>
               Пройти тест ещё раз
             </button>
 
-            {wrongQuestions.length > 0 ?
+            {wrongQuestions.length > 0 ? (
               <button
                 type="button"
                 className="w-full py-4 rounded-2xl bg-transparent hover:bg-black/5 text-ink font-bold text-center transition-all cursor-pointer border-2 border-ink"
                 onClick={() => setScreen("review")}>
                 Разобрать ошибки ({wrongQuestions.length})
               </button>
-            : null}
+            ) : null}
 
             <div className="pt-2">
               <button
@@ -374,7 +416,7 @@ const handleNext = () => {
         </div>
       )}
 
-      {screen === "review" && (
+      {screen === "review" && result && (
         <div className="relative flex flex-col justify-between min-h-[580px] bg-[#f5f3ef] p-6 rounded-3xl text-ink shadow-md">
           <div className="grid gap-4">
             <div>
@@ -391,18 +433,19 @@ const handleNext = () => {
             </div>
 
             <div className="grid gap-4 pt-2">
-              {wrongQuestions.map((q) => (
+              {wrongQuestions.map((question, index) => (
                 <div
-                  key={q.id}
+                  key={`${question.question}-${index}`}
                   className="grid gap-2 bg-white rounded-2xl p-4 shadow-sm border border-[#e5e2dc]">
                   <div className="font-bold text-base text-ink mb-1">
-                    {q.question}
+                    {question.question}
                   </div>
                   <div className="bg-[#ffd3cc] text-red-900 font-medium px-3.5 py-2.5 rounded-xl text-sm flex items-center gap-2">
-                    <span>✕</span> Твой ответ: {q.options[userAnswers[q.id]]}
+                    <span>✕</span> Твой ответ:{" "}
+                    {question.options[question.selected_index]}
                   </div>
                   <div className="bg-[#bde8d3] text-emerald-900 font-medium px-3.5 py-2.5 rounded-xl text-sm flex items-center gap-2">
-                    <span>✓</span> Верно: {q.options[q.correctAnswer]}
+                    <span>✓</span> Верно: {question.correct_option}
                   </div>
                 </div>
               ))}
@@ -413,7 +456,7 @@ const handleNext = () => {
             <button
               type="button"
               className="w-full py-4 rounded-2xl bg-transparent hover:bg-black/5 text-ink font-bold text-center transition-all cursor-pointer border-2 border-ink"
-              onClick={handleStart}>
+              onClick={() => void handleStart()}>
               Пройти другой тест
             </button>
           </div>
