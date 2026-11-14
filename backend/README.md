@@ -13,8 +13,16 @@
 cd backend
 cp .env.example .env
 uv sync
+
+cd ..
+docker compose up -d db
+cd backend
+
 uv run uvicorn app.main:app --reload --port 8000
 ```
+
+По умолчанию `DATABASE_URL` указывает на локальный PostgreSQL из
+`docker-compose.yml`.
 
 Без ключей AI-провайдеров доступен только `mock`.
 
@@ -39,6 +47,24 @@ uv run uvicorn app.main:app --reload --port 8000
 - `GET /api/v1/resumes/checks` — история.
 - `GET /api/v1/resumes/checks/{id}` — проверка с сообщениями.
 - `DELETE /api/v1/resumes/checks/{id}` — удалить проверку.
+
+### Тесты
+
+- `GET /api/v1/tests/languages` — языки и количество тестов.
+- `GET /api/v1/tests/stats` — количество завершённых тестов.
+- `POST /api/v1/tests/attempts` — начать случайный тест.
+- `POST /api/v1/tests/attempts/{id}/answers` — ответить на вопрос.
+- `POST /api/v1/tests/attempts/{id}/finish` — завершить и получить результат.
+- `GET /api/v1/tests/attempts` — история попыток.
+
+Каталог тестов хранится в `backend/app/modules/tests/data/tests.json`.
+После изменения файла:
+
+```bash
+uv run python -m app.modules.tests.seed --reset
+```
+
+Без `--reset` сид выполнится только если каталог пустой.
 
 ### Интервью
 
@@ -74,3 +100,6 @@ backend/
 ```bash
 uv run pytest -q
 ```
+
+По умолчанию используется SQLite in-memory. Для PostgreSQL задайте
+`TEST_DATABASE_URL`, как в CI.

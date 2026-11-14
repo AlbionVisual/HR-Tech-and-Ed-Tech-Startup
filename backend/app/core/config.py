@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     openrouter_site_url: str = "http://localhost:5273"
     openrouter_app_name: str = "Interview MVP"
 
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/hrtech"
+    database_pool_size: int = 10
+    database_echo: bool = False
+
     @property
     def cors_origins(self) -> list[str]:
         return [item.strip() for item in self.ai_cors_origins.split(",") if item.strip()]

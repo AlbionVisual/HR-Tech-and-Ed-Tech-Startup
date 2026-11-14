@@ -7,6 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.errors import install_error_handlers
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.db.connection import database
+from app.core.db.schema import ensure_schema
+from app.modules.tests.seed import seed_test_catalog
 
 
 @asynccontextmanager
@@ -14,10 +17,14 @@ async def lifespan(app: FastAPI):
     app.state.http = httpx.AsyncClient(
         timeout=httpx.Timeout(settings.ai_timeout_seconds, connect=15.0)
     )
+    await database.start()
+    await ensure_schema(database)
+    await seed_test_catalog(database)
     try:
         yield
     finally:
         await app.state.http.aclose()
+        await database.stop()
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)

@@ -33,6 +33,9 @@ npm run lint         # ESLint
   `POST /api/v1/interviews/{id}/messages:stream`,
   `POST /api/v1/interviews/{id}/next-question:stream`,
   `GET /api/v1/interviews`.
+- Тесты: `GET /api/v1/tests/languages`, `POST /api/v1/tests/attempts`,
+  `POST /api/v1/tests/attempts/{id}/answers`,
+  `POST /api/v1/tests/attempts/{id}/finish`.
 - Анализ резюме: `POST /api/v1/resumes/extract`,
   `POST /api/v1/resumes/checks:stream`,
   `POST /api/v1/resumes/checks/{id}/messages:stream`.
