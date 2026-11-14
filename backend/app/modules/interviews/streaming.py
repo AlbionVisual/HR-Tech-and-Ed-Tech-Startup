@@ -85,7 +85,7 @@ class InterviewStreamer:
                     yield {
                         "type": "done",
                         "interview_id": str(session.id),
-                        "assistant_message_id": str(assistant.id),
+                        "assistant_message_id": str(assistant.id) if assistant else None,
                         "phase": phase,
                         "progress": turn.progress,
                     }
