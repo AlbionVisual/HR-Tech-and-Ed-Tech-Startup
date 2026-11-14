@@ -7,17 +7,16 @@ import type { ProfileUser } from '../features/profile/types'
 
 type Props = {
 	user: ProfileUser | null
-	onLogin: (user: ProfileUser) => void
 	onLogout: () => void
 }
 
 type ProfileView = 'home' | 'settings' | 'about' | 'keys'
 
-export function ProfilePage({ user, onLogin, onLogout }: Props) {
+export function ProfilePage({ user, onLogout }: Props) {
 	const [view, setView] = useState<ProfileView>('home')
 
 	if (!user) {
-		return <ProfileLogin onLogin={onLogin} />
+		return <ProfileLogin />
 	}
 
 	const back = () => setView('home')

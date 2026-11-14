@@ -85,6 +85,7 @@ async function* streamRequest(
   try {
     response = await fetch(`${apiBaseUrl}${url}`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
       signal,
@@ -166,7 +167,9 @@ export function nextInterviewQuestionStream(input: {
 }
 
 export async function listInterviews(): Promise<InterviewSessionSummary[]> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/interviews`)
+  const response = await fetch(`${apiBaseUrl}/api/v1/interviews`, {
+    credentials: 'include',
+  })
   if (!response.ok) throw new Error(await readError(response))
   return (await response.json()) as InterviewSessionSummary[]
 }
@@ -174,7 +177,9 @@ export async function listInterviews(): Promise<InterviewSessionSummary[]> {
 export async function getInterview(
   sessionId: string,
 ): Promise<InterviewSessionDetail> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/interviews/${sessionId}`)
+  const response = await fetch(`${apiBaseUrl}/api/v1/interviews/${sessionId}`, {
+    credentials: 'include',
+  })
   if (!response.ok) throw new Error(await readError(response))
   return (await response.json()) as InterviewSessionDetail
 }
@@ -182,6 +187,7 @@ export async function getInterview(
 export async function deleteInterview(sessionId: string): Promise<void> {
   const response = await fetch(`${apiBaseUrl}/api/v1/interviews/${sessionId}`, {
     method: 'DELETE',
+    credentials: 'include',
   })
   if (!response.ok) throw new Error(await readError(response))
 }
@@ -189,6 +195,7 @@ export async function deleteInterview(sessionId: string): Promise<void> {
 export async function clearInterviews(): Promise<void> {
   const response = await fetch(`${apiBaseUrl}/api/v1/interviews`, {
     method: 'DELETE',
+    credentials: 'include',
   })
   if (!response.ok) throw new Error(await readError(response))
 }

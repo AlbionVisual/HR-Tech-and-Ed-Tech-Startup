@@ -92,7 +92,9 @@ export async function loadCatalog(): Promise<void> {
 
   loading = (async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/ai/models`)
+      const response = await fetch(`${apiBaseUrl}/api/v1/ai/models`, {
+        credentials: 'include',
+      })
       if (!response.ok) return
 
       const payload = (await response.json()) as {

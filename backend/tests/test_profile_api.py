@@ -1,20 +1,23 @@
-async def test_create_and_login(client):
-    response = await client.post(
-        "/api/v1/profile/users",
-        json={"username": "bob", "password": "secret123", "profile": {"x": 1}},
+async def test_profile_read_and_update(client):
+    response = await client.get("/api/v1/profile")
+    assert response.status_code == 200, response.text
+    profile = response.json()
+    assert profile["display_name"] == "Test user"
+    assert profile["identities"] == []
+
+    response = await client.patch(
+        "/api/v1/profile",
+        json={"display_name": "Bob", "profile": {"theme": "dark"}},
     )
     assert response.status_code == 200, response.text
-    user = response.json()
-    assert user["username"] == "bob"
+    updated = response.json()
+    assert updated["display_name"] == "Bob"
+    assert updated["profile"]["theme"] == "dark"
 
-    response = await client.post(
-        "/api/v1/profile/login",
-        json={"username": "bob", "password": "secret123"},
-    )
+    response = await client.get("/api/v1/profile")
     assert response.status_code == 200
+    assert response.json()["display_name"] == "Bob"
 
-    response = await client.post(
-        "/api/v1/profile/login",
-        json={"username": "bob", "password": "wrong"},
-    )
-    assert response.status_code == 401
+    response = await client.get("/api/v1/auth/me")
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "Bob"

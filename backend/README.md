@@ -1,9 +1,10 @@
 # Backend — FastAPI
 
-Серверная часть HR-Tech & Ed-Tech Startup: AI-провайдеры, анализ резюме и API.
+Серверная часть HR-Tech & Ed-Tech Startup: AI-провайдеры, анализ резюме,
+интервью, тесты и авторизация через Google и Telegram.
 
-Сейчас данные резюме хранятся в памяти процесса. PostgreSQL и авторизация —
-следующие этапы.
+Данные хранятся в PostgreSQL. Сессия — HttpOnly cookie, провайдерные
+идентичности — в `auth_identities`.
 
 ## Запуск
 
@@ -39,6 +40,19 @@ uv run uvicorn app.main:app --reload --port 8000
 - `GET /api/v1/ai/models` — провайдеры и модели.
 - `POST /api/v1/ai/chat/stream` — SSE-стрим интервью.
 - `GET /api/v1/ai/probe?provider=gemini` — проверка Gemini.
+
+### Авторизация
+
+- `POST /api/v1/auth/google` — вход по Google ID token.
+- `GET /api/v1/auth/telegram/start` — редирект в Telegram OIDC.
+- `GET /api/v1/auth/telegram/callback` — callback Telegram.
+- `POST /api/v1/auth/logout` — выход.
+- `GET /api/v1/auth/me` — текущий пользователь.
+- `GET /api/v1/profile` — профиль.
+- `PATCH /api/v1/profile` — имя, аватар, настройки.
+
+Env: `GOOGLE_CLIENT_ID`, `TELEGRAM_CLIENT_ID`, `TELEGRAM_CLIENT_SECRET`,
+`TELEGRAM_REDIRECT_URI`, `APP_PUBLIC_URL`, `SESSION_SECRET`.
 
 ### Резюме
 

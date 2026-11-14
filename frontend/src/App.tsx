@@ -1,16 +1,20 @@
 import { useState } from "react";
+import { AuthProvider } from "./auth/AuthContext";
+import { useAuth } from "./auth/useAuth";
 import { BottomNav } from "./components/BottomNav";
 import { TopBar } from "./components/TopBar";
 import { AccessBanner } from "./components/AccessBanner";
 import { config, type PageId } from "./config";
 import { InterviewPage } from "./pages/InterviewPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { ProfileLogin } from "./features/profile/ProfileLogin";
+import type { ProfileUser } from "./features/profile/types";
 import { ResumePage } from "./pages/ResumePage";
 import { TestsPage } from "./pages/TestsPage";
 import { VoiceProvider } from "./speech/VoiceContext";
-import type { ProfileUser } from "./features/profile/types";
 
-function App() {
+function AppInner() {
+  const { user, status, logout } = useAuth();
   const [page, setPage] = useState<PageId>(config.app.defaultPage);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -19,7 +23,6 @@ function App() {
   );
   const [newChatNonce, setNewChatNonce] = useState(0);
   const [newResumeNonce, setNewResumeNonce] = useState(0);
-  const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
 
   const handleChatSelect = (id: string) => {
     setActiveChatId(id);
@@ -43,16 +46,37 @@ function App() {
     setIsSideMenuOpen(false);
   };
 
+  if (status === "loading") {
+    return (
+      <div className="grid h-full place-items-center bg-bg text-muted">
+        Загрузка…
+      </div>
+    );
+  }
+
+  if (status === "anonymous" || !user) {
+    return (
+      <div className="h-full bg-bg">
+        <ProfileLogin />
+      </div>
+    );
+  }
+
+  const profileUser: ProfileUser = {
+    name:
+      user.display_name ||
+      user.identities[0]?.username ||
+      user.identities[0]?.display_name ||
+      "Пользователь",
+    avatarUrl: user.avatar_url || user.identities[0]?.avatar_url || "",
+  };
+
   const title =
     config.app.pages.find((p) => p.id === page)?.title ?? "Приложение";
-
   const isProfile = page === "profile";
-  const isLogin = isProfile && !profileUser;
-  const gridRows = isLogin
-    ? "grid-rows-[1fr]"
-    : isProfile
-      ? "grid-rows-[1fr_var(--spacing-nav)]"
-      : "grid-rows-[var(--spacing-topbar)_1fr_var(--spacing-nav)]";
+  const gridRows = isProfile
+    ? "grid-rows-[1fr_var(--spacing-nav)]"
+    : "grid-rows-[var(--spacing-topbar)_1fr_var(--spacing-nav)]";
 
   return (
     <VoiceProvider>
@@ -73,32 +97,34 @@ function App() {
         ) : null}
         <main className="min-h-0 overflow-auto">
           <AccessBanner />
-          {page === "tests" ?
-            <TestsPage />
-          : null}
-          {page === "resume" ?
+          {page === "tests" ? <TestsPage /> : null}
+          {page === "resume" ? (
             <ResumePage
               key={`${activeResumeCheckId ?? "new-resume"}-${newResumeNonce}`}
               checkId={activeResumeCheckId}
             />
-          : null}
-          {page === "interview" ?
+          ) : null}
+          {page === "interview" ? (
             <InterviewPage
               key={`${activeChatId ?? "new"}-${newChatNonce}`}
               chatId={activeChatId}
             />
-          : null}
-          {isProfile ?
-            <ProfilePage
-              user={profileUser}
-              onLogin={setProfileUser}
-              onLogout={() => setProfileUser(null)}
-            />
-          : null}
+          ) : null}
+          {isProfile ? (
+            <ProfilePage user={profileUser} onLogout={() => void logout()} />
+          ) : null}
         </main>
-        {!isLogin ? <BottomNav active={page} onChange={setPage} /> : null}
+        <BottomNav active={page} onChange={setPage} />
       </div>
     </VoiceProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }
 

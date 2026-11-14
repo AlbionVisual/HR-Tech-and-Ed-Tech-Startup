@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.v1.deps import get_resume_service
 from app.api.v1.sse import sse_response
-from app.core.deps import get_current_user_id
+from app.modules.auth.deps import get_current_user_id
 from app.core.sse import sse
 from app.modules.resumes.schemas import (
     ResumeCheck,
@@ -45,6 +45,7 @@ def _stream(
 @router.post("/extract", response_model=ResumeExtractResponse)
 async def extract_resume(
     file: UploadFile = File(...),
+    user_id: UUID = Depends(get_current_user_id),
     service: ResumeService = Depends(get_resume_service),
 ) -> ResumeExtractResponse:
     data = await file.read(MAX_FILE_SIZE + 1)

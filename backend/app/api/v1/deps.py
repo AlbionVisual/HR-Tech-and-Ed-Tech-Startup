@@ -3,7 +3,6 @@ from fastapi import Depends, Request
 from app.core.ai.service import AiChatService
 from app.core.config import settings
 from app.core.db.connection import database
-from app.core.db.service import DbService
 from app.modules.interviews.ai import InterviewAi
 from app.modules.interviews.repository_sql import SqlInterviewRepository
 from app.modules.interviews.service import InterviewService
@@ -15,9 +14,6 @@ from app.modules.tests.service import TestService
 
 def get_ai_service(request: Request) -> AiChatService:
     return AiChatService(settings, getattr(request.app.state, "http", None))
-
-def get_db_service() -> DbService:
-    return DbService(database)
 
 
 def get_interview_service(

@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.core.ai.errors import AiRequestError
+from app.modules.auth.errors import AuthError
 from app.modules.interviews.service import (
     InterviewNotFoundError,
     InterviewValidationError,
@@ -19,6 +20,10 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(AuthError)
+    async def auth_error(_: Request, exc: AuthError) -> JSONResponse:
+        return _error(exc.status_code, exc.code, exc.message)
+
     @app.exception_handler(AiRequestError)
     async def ai_error(_: Request, exc: AiRequestError) -> JSONResponse:
         return _error(400, "bad_request", str(exc))

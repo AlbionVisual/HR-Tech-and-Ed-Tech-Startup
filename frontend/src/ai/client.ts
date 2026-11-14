@@ -35,6 +35,7 @@ export async function* chatStream(
   try {
     response = await fetch(`${apiBaseUrl}/api/v1/ai/chat/stream`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: input.signal,

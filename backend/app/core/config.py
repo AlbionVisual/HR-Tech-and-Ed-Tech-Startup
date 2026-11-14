@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     aiai_api_key: str = ""
 
     ai_default_provider: str = "openrouter"
-    ai_cors_origins: str = "http://localhost:5273,https://albionvisual.github.io"
+    ai_cors_origins: str = "http://localhost:5273,https://localhost:5273,https://albionvisual.github.io"
     ai_timeout_seconds: float = 120.0
     ai_max_messages: int = 100
     ai_max_message_chars: int = 50_000
@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/hrtech"
     database_pool_size: int = 10
     database_echo: bool = False
+
+    google_client_id: str = ""
+    telegram_client_id: str = ""
+    telegram_client_secret: str = ""
+    telegram_redirect_uri: str = "http://localhost:8000/api/v1/auth/telegram/callback"
+    app_public_url: str = "https://localhost:5273"
+    session_secret: str = "dev-session-secret-change-me"
+    session_cookie_name: str = "session"
+    session_ttl_days: int = 30
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
 
     @property
     def cors_origins(self) -> list[str]:

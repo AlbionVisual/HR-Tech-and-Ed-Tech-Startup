@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.v1.deps import get_interview_service
 from app.api.v1.sse import sse_response
-from app.core.deps import get_current_user_id
+from app.modules.auth.deps import get_current_user_id
 from app.core.sse import sse
 from app.modules.interviews.schemas import (
     InterviewMessage,

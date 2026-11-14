@@ -109,6 +109,7 @@ async function* streamRequest(
   try {
     response = await fetch(`${apiBaseUrl}${url}`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal,
@@ -155,6 +156,7 @@ export async function extractResume(
 
   const response = await fetch(`${apiBaseUrl}/api/v1/resumes/extract`, {
     method: 'POST',
+    credentials: 'include',
     body: form,
   })
 
@@ -196,7 +198,9 @@ export function sendResumeMessageStream(input: {
 }
 
 export async function listResumeChecks(): Promise<ResumeCheckSummary[]> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks`)
+  const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks`, {
+    credentials: 'include',
+  })
   if (!response.ok) throw new Error(await readError(response))
   return (await response.json()) as ResumeCheckSummary[]
 }
@@ -204,7 +208,9 @@ export async function listResumeChecks(): Promise<ResumeCheckSummary[]> {
 export async function getResumeCheck(
   checkId: string,
 ): Promise<ResumeCheckDetail> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks/${checkId}`)
+  const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks/${checkId}`, {
+    credentials: 'include',
+  })
   if (!response.ok) throw new Error(await readError(response))
   return (await response.json()) as ResumeCheckDetail
 }
@@ -212,6 +218,7 @@ export async function getResumeCheck(
 export async function deleteResumeCheck(checkId: string): Promise<void> {
   const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks/${checkId}`, {
     method: 'DELETE',
+    credentials: 'include',
   })
   if (!response.ok) throw new Error(await readError(response))
 }

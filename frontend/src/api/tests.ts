@@ -80,7 +80,10 @@ async function request<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, init)
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    credentials: 'include',
+  })
   if (!response.ok) throw new Error(await readError(response))
   return (await response.json()) as T
 }

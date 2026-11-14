@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../../auth/useAuth'
 import type { ProfileUser } from './types'
 
 type Props = {
@@ -21,10 +22,25 @@ export function ProfileHome({
 }: Props) {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const [name, setName] = useState(user.name)
+	const [saveError, setSaveError] = useState('')
+	const { saveProfile } = useAuth()
 
 	function choose(action: () => void) {
 		setMenuOpen(false)
 		action()
+	}
+
+	async function commitName() {
+		const next = name.trim()
+		if (!next || next === user.name) return
+		try {
+			await saveProfile({ display_name: next })
+			setSaveError('')
+		} catch (error) {
+			setSaveError(
+				error instanceof Error ? error.message : 'Не удалось сохранить имя',
+			)
+		}
 	}
 
 	return (
@@ -94,7 +110,14 @@ export function ProfileHome({
 						className="mt-auto w-full rounded-2xl border-2 border-[#FE502D] bg-transparent px-4 py-3 font-sans text-base text-ink outline-none"
 						value={name}
 						onChange={(event) => setName(event.target.value)}
+						onBlur={() => void commitName()}
+						onKeyDown={(event) => {
+							if (event.key === 'Enter') event.currentTarget.blur()
+						}}
 					/>
+					{saveError ? (
+						<p className="m-0 mt-3 text-sm text-danger">{saveError}</p>
+					) : null}
 				</section>
 			</div>
 		</div>

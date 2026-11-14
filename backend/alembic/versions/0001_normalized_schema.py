@@ -13,7 +13,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from alembic import op
 
-from app.core.db.models import (
+from app.core.db.schema_0001 import (
     Base,
     InterviewMessage,
     InterviewSession,

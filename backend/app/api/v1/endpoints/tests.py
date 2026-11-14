@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from app.api.v1.deps import get_test_service
-from app.core.deps import get_current_user_id
+from app.modules.auth.deps import get_current_user_id
 from app.modules.tests.schemas import (
     TestAnswerCreate,
     TestAnswerOut,
