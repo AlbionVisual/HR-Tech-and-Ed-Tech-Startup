@@ -26,6 +26,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/hrtech_test
       TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/hrtech_test
     defaults:
       run:
@@ -36,6 +37,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen --group dev
+      - run: uv run alembic upgrade head
       - run: uv run pytest -q
 
   frontend:

@@ -33,6 +33,7 @@ cd ..
 docker compose up -d db
 cd backend
 
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
 ```
 

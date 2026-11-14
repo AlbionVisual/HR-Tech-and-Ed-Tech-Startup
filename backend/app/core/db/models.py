@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -32,30 +33,107 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     salt: Mapped[str] = mapped_column(String(64))
     profile: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
-class InterviewTest(Base):
-    __tablename__ = "interview_tests"
+class InterviewSession(Base):
+    __tablename__ = "interview_sessions"
+    __table_args__ = (
+        Index("ix_interview_sessions_user_updated", "user_id", "updated_at"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), index=True)
     mode: Mapped[str] = mapped_column(String(32))
     title: Mapped[str] = mapped_column(String(120))
-    payload: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    vacancy: Mapped[dict | None] = mapped_column(JSON_VALUE, nullable=True)
+    phase: Mapped[str] = mapped_column(String(32), default="interviewing")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
-class ResumeTest(Base):
-    __tablename__ = "resume_tests"
+class InterviewMessage(Base):
+    __tablename__ = "interview_messages"
+    __table_args__ = (UniqueConstraint("session_id", "seq"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    thought: Mapped[str] = mapped_column(Text, default="")
+    is_feedback: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(16), default="complete")
+    seq: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ResumeCheck(Base):
+    __tablename__ = "resume_checks"
+    __table_args__ = (
+        Index("ix_resume_checks_user_updated", "user_id", "updated_at"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), index=True)
     mode: Mapped[str] = mapped_column(String(32))
-    text: Mapped[str] = mapped_column(Text)
-    result: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    title: Mapped[str] = mapped_column(String(120))
+    source_type: Mapped[str] = mapped_column(String(16), default="text")
+    source_filename: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    source_text: Mapped[str] = mapped_column(Text)
+    source_chars: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(32), default="checking")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class ResumeMessage(Base):
+    __tablename__ = "resume_messages"
+    __table_args__ = (UniqueConstraint("check_id", "seq"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    check_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("resume_checks.id", ondelete="CASCADE"),
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    thought: Mapped[str] = mapped_column(Text, default="")
+    is_feedback: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(16), default="complete")
+    seq: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class TestLanguage(Base):
@@ -115,8 +193,12 @@ class TestAttempt(Base):
     correct_count: Mapped[int] = mapped_column(Integer, default=0)
     answered_count: Mapped[int] = mapped_column(Integer, default=0)
     total_count: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class TestAttemptAnswer(Base):
@@ -135,4 +217,6 @@ class TestAttemptAnswer(Base):
     )
     selected_index: Mapped[int] = mapped_column(Integer)
     is_correct: Mapped[bool] = mapped_column(Boolean)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

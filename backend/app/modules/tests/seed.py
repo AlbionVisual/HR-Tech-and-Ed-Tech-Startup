@@ -13,7 +13,6 @@ from app.core.db.models import (
     TestQuestion,
     TestSet,
 )
-from app.core.db.schema import ensure_schema
 
 
 DATA_FILE = Path(__file__).parent / "data" / "tests.json"
@@ -79,7 +78,6 @@ async def _main() -> None:
     args = parser.parse_args()
 
     await database.start()
-    await ensure_schema(database)
     await seed_test_catalog(database, reset=args.reset)
     await database.stop()
     print("Test catalog seeded")

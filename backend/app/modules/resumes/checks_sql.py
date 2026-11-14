@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
-from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy import func, select
 
 from app.core.db.connection import Database
-from app.core.db.models import ResumeTest
+from app.core.db.models import ResumeCheck as ResumeCheckRow
+from app.core.db.models import ResumeMessage as ResumeMessageRow
 from app.modules.resumes.schemas import ResumeCheck, ResumeMessage
 
 
@@ -23,27 +23,18 @@ class ChecksSql:
         source_filename: str | None = None,
         source_text: str,
     ) -> ResumeCheck:
-        now = datetime.now(timezone.utc)
-        result = {
-            "title": title,
-            "status": "checking",
-            "progress": 0,
-            "source_type": source_type,
-            "source_filename": source_filename,
-            "source_text": source_text,
-            "source_chars": len(source_text),
-            "messages": [],
-            "deleted_at": None,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat(),
-        }
         async with self._db.session() as session:
-            row = ResumeTest(
+            row = ResumeCheckRow(
                 id=uuid4(),
                 user_id=user_id,
                 mode=mode,
-                text=source_text,
-                result=result,
+                title=title,
+                source_type=source_type,
+                source_filename=source_filename,
+                source_text=source_text,
+                source_chars=len(source_text),
+                status="checking",
+                progress=0,
             )
             session.add(row)
             await session.flush()
@@ -51,22 +42,62 @@ class ChecksSql:
 
     async def get_check(self, user_id: UUID, check_id: UUID) -> ResumeCheck | None:
         async with self._db.session() as session:
-            row = await session.get(ResumeTest, check_id)
-            if row is None or row.user_id != user_id or row.result.get("deleted_at"):
-                return None
-            return self._to_schema(row)
+            row = await session.scalar(
+                select(ResumeCheckRow).where(
+                    ResumeCheckRow.id == check_id,
+                    ResumeCheckRow.user_id == user_id,
+                    ResumeCheckRow.deleted_at.is_(None),
+                )
+            )
+            return self._to_schema(row) if row else None
 
     async def list_checks(self, user_id: UUID) -> list[ResumeCheck]:
         async with self._db.session() as session:
-            rows = await session.scalars(
-                select(ResumeTest).where(ResumeTest.user_id == user_id)
+            rows = (
+                await session.scalars(
+                    select(ResumeCheckRow)
+                    .where(
+                        ResumeCheckRow.user_id == user_id,
+                        ResumeCheckRow.deleted_at.is_(None),
+                    )
+                    .order_by(ResumeCheckRow.updated_at.desc())
+                )
+            ).all()
+            return [self._to_schema(row) for row in rows]
+
+    async def update_check(
+        self,
+        check_id: UUID,
+        *,
+        status: str,
+        progress: int | None = None,
+    ) -> ResumeCheck:
+        async with self._db.session() as session:
+            row = await session.get(ResumeCheckRow, check_id)
+            if row is None:
+                raise KeyError(f"Resume check not found: {check_id}")
+            row.status = status
+            if progress is not None:
+                row.progress = progress
+            row.updated_at = datetime.now(timezone.utc)
+            await session.flush()
+            return self._to_schema(row)
+
+    async def soft_delete_check(self, user_id: UUID, check_id: UUID) -> bool:
+        async with self._db.session() as session:
+            row = await session.scalar(
+                select(ResumeCheckRow).where(
+                    ResumeCheckRow.id == check_id,
+                    ResumeCheckRow.user_id == user_id,
+                    ResumeCheckRow.deleted_at.is_(None),
+                )
             )
-            checks = [
-                self._to_schema(r)
-                for r in rows
-                if not (r.result or {}).get("deleted_at")
-            ]
-            return sorted(checks, key=lambda item: item.updated_at, reverse=True)
+            if row is None:
+                return False
+            now = datetime.now(timezone.utc)
+            row.deleted_at = now
+            row.updated_at = now
+            return True
 
     async def add_message(
         self,
@@ -79,94 +110,77 @@ class ChecksSql:
         status: str = "complete",
     ) -> ResumeMessage:
         async with self._db.session() as session:
-            row = await session.get(ResumeTest, check_id)
-            if row is None:
+            parent = await session.get(ResumeCheckRow, check_id)
+            if parent is None:
                 raise KeyError(f"Resume check not found: {check_id}")
-            msgs = row.result.setdefault("messages", [])
-
-            now = datetime.now(timezone.utc)
-            message = ResumeMessage(
+            max_seq = await session.scalar(
+                select(func.max(ResumeMessageRow.seq)).where(
+                    ResumeMessageRow.check_id == check_id
+                )
+            )
+            row = ResumeMessageRow(
                 id=uuid4(),
                 check_id=check_id,
-                role=role,  # type: ignore
+                role=role,
                 content=content,
                 thought=thought,
                 is_feedback=is_feedback,
-                status=status,  # type: ignore
-                seq=len(msgs) + 1,
-                created_at=now,
+                status=status,
+                seq=int(max_seq or 0) + 1,
             )
-            msgs.append(message.model_dump(mode="json"))
-            row.result["updated_at"] = now.isoformat()
-            flag_modified(row, "result")
-            return message
+            session.add(row)
+            parent.updated_at = datetime.now(timezone.utc)
+            await session.flush()
+            return self._to_message(row)
 
     async def list_messages(self, check_id: UUID) -> list[ResumeMessage]:
         async with self._db.session() as session:
-            row = await session.get(ResumeTest, check_id)
-            if row is None:
-                return []
-            raw = row.result.get("messages", [])
-            return [ResumeMessage(**m) for m in raw]
+            rows = (
+                await session.scalars(
+                    select(ResumeMessageRow)
+                    .where(ResumeMessageRow.check_id == check_id)
+                    .order_by(ResumeMessageRow.seq)
+                )
+            ).all()
+            return [self._to_message(row) for row in rows]
 
     async def count_messages(self, check_id: UUID) -> int:
         async with self._db.session() as session:
-            row = await session.get(ResumeTest, check_id)
-            if row is None:
-                return 0
-            return len(row.result.get("messages", []))
-
-    async def update_check(self, check_id: UUID, *, status: str, progress: int | None = None) -> ResumeCheck:
-        async with self._db.session() as session:
-            row = await session.get(ResumeTest, check_id)
-            if row is None:
-                raise KeyError(f"Resume check not found: {check_id}")
-            row.result["status"] = status
-            if progress is not None:
-                row.result["progress"] = progress
-            row.result["updated_at"] = datetime.now(timezone.utc).isoformat()
-            flag_modified(row, "result")
-            return self._to_schema(row)
-
-    async def soft_delete_check(self, user_id: UUID, check_id: UUID) -> bool:
-        async with self._db.session() as session:
-            row = await session.get(ResumeTest, check_id)
-            if row is None or row.user_id != user_id:
-                return False
-            now = datetime.now(timezone.utc).isoformat()
-            row.result["deleted_at"] = now
-            row.result["updated_at"] = now
-            flag_modified(row, "result")
-            return True
+            count = await session.scalar(
+                select(func.count())
+                .select_from(ResumeMessageRow)
+                .where(ResumeMessageRow.check_id == check_id)
+            )
+            return int(count or 0)
 
     @staticmethod
-    def _to_schema(row: ResumeTest) -> ResumeCheck:
-        p = row.result or {}
-        # Конвертируем строки обратно в datetime
-        created_at = p.get("created_at")
-        if isinstance(created_at, str):
-            created_at = datetime.fromisoformat(created_at)
-
-        updated_at = p.get("updated_at")
-        if isinstance(updated_at, str):
-            updated_at = datetime.fromisoformat(updated_at)
-
-        deleted_at = p.get("deleted_at")
-        if isinstance(deleted_at, str):
-            deleted_at = datetime.fromisoformat(deleted_at)
-
+    def _to_schema(row: ResumeCheckRow) -> ResumeCheck:
         return ResumeCheck(
             id=row.id,
             user_id=row.user_id,
             mode=row.mode,
-            title=p.get("title", "Проверка резюме"),
-            status=p.get("status", "checking"),
-            progress=p.get("progress", 0),
-            source_type=p.get("source_type", "text"),
-            source_filename=p.get("source_filename"),
-            source_text=p.get("source_text", row.text),
-            source_chars=p.get("source_chars", len(row.text)),
-            created_at=created_at,
-            updated_at=updated_at,
-            deleted_at=deleted_at,
+            title=row.title,
+            status=row.status,
+            progress=row.progress,
+            source_type=row.source_type,
+            source_filename=row.source_filename,
+            source_text=row.source_text,
+            source_chars=row.source_chars,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            deleted_at=row.deleted_at,
+        )
+
+    @staticmethod
+    def _to_message(row: ResumeMessageRow) -> ResumeMessage:
+        return ResumeMessage(
+            id=row.id,
+            check_id=row.check_id,
+            role=row.role,
+            content=row.content,
+            thought=row.thought,
+            is_feedback=row.is_feedback,
+            status=row.status,
+            seq=row.seq,
+            created_at=row.created_at,
         )

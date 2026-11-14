@@ -18,11 +18,12 @@ cd ..
 docker compose up -d db
 cd backend
 
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
 По умолчанию `DATABASE_URL` указывает на локальный PostgreSQL из
-`docker-compose.yml`.
+`docker-compose.yml`. Схема создаётся миграциями Alembic, а не `create_all`.
 
 Без ключей AI-провайдеров доступен только `mock`.
 
@@ -61,6 +62,7 @@ uv run uvicorn app.main:app --reload --port 8000
 После изменения файла:
 
 ```bash
+uv run alembic upgrade head
 uv run python -m app.modules.tests.seed --reset
 ```
 
@@ -87,9 +89,11 @@ backend/
 │   │   ├── config.py            # настройки из .env
 │   │   ├── deps.py              # временный demo user
 │   │   └── ai/                  # провайдеры, промпты, SSE
-│   └── modules/                 # домены: резюме, интервью
+│   └── modules/                 # домены: резюме, интервью, тесты
 │       ├── resumes/             # парсеры, repository, service
-│       └── interviews/          # sessions, messages, SSE
+│       ├── interviews/          # sessions, messages, SSE
+│       └── tests/               # каталог, попытки, seed
+├── alembic/                     # миграции
 ├── tests/
 ├── pyproject.toml
 └── uv.lock
