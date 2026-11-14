@@ -14,7 +14,11 @@ function App() {
   const [page, setPage] = useState<PageId>(config.app.defaultPage);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [activeResumeCheckId, setActiveResumeCheckId] = useState<string | null>(
+    null,
+  );
   const [newChatNonce, setNewChatNonce] = useState(0);
+  const [newResumeNonce, setNewResumeNonce] = useState(0);
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
 
   const handleChatSelect = (id: string) => {
@@ -25,6 +29,17 @@ function App() {
   const handleNewChat = () => {
     setActiveChatId(null);
     setNewChatNonce((value) => value + 1);
+    setIsSideMenuOpen(false);
+  };
+
+  const handleResumeSelect = (id: string) => {
+    setActiveResumeCheckId(id);
+    setIsSideMenuOpen(false);
+  };
+
+  const handleNewResume = () => {
+    setActiveResumeCheckId(null);
+    setNewResumeNonce((value) => value + 1);
     setIsSideMenuOpen(false);
   };
 
@@ -45,11 +60,15 @@ function App() {
         {!isProfile ? (
           <TopBar
             title={title}
+            page={page}
             isSideMenuOpen={isSideMenuOpen}
             onToggleSideMenu={() => setIsSideMenuOpen(!isSideMenuOpen)}
             activeChatId={activeChatId}
+            activeResumeCheckId={activeResumeCheckId}
             onChatSelect={handleChatSelect}
             onNewChat={handleNewChat}
+            onResumeSelect={handleResumeSelect}
+            onNewResume={handleNewResume}
           />
         ) : null}
         <main className="min-h-0 overflow-auto">
@@ -58,7 +77,10 @@ function App() {
             <TestsPage />
           : null}
           {page === "resume" ?
-            <ResumePage />
+            <ResumePage
+              key={`${activeResumeCheckId ?? "new-resume"}-${newResumeNonce}`}
+              checkId={activeResumeCheckId}
+            />
           : null}
           {page === "interview" ?
             <InterviewPage

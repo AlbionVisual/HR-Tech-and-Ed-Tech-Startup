@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  getResumeCheck,
   sendResumeMessageStream,
   startResumeCheckStream,
+  type ResumeMessage,
   type ResumeMode,
   type ResumeSource,
   type ResumeStreamEvent,
@@ -23,7 +25,15 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export function useResumeSession() {
+function toChatMessage(message: ResumeMessage): ChatMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+  }
+}
+
+export function useResumeSession(initialCheckId?: string | null) {
   const [phase, setPhase] = useState<ResumePhase>('idle')
   const [mode, setMode] = useState<ResumeMode | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -31,8 +41,50 @@ export function useResumeSession() {
   const [error, setError] = useState('')
   const [thought, setThought] = useState('')
   const [progress, setProgress] = useState(0)
-  const [checkId, setCheckId] = useState<string | null>(null)
+  const [checkId, setCheckId] = useState<string | null>(
+    initialCheckId ?? null,
+  )
+  const [isLoading, setIsLoading] = useState(Boolean(initialCheckId))
   const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    if (!initialCheckId) return
+
+    let cancelled = false
+    void (async () => {
+      try {
+        const detail = await getResumeCheck(initialCheckId)
+        if (cancelled) return
+        setMode(detail.mode)
+        setMessages(detail.messages.map(toChatMessage))
+        setProgress(detail.progress)
+        setCheckId(detail.id)
+        setPhase('check_resume')
+        setStatus(detail.status === 'error' ? 'error' : 'idle')
+        setError(
+          detail.status === 'error'
+            ? 'Последняя проверка завершилась ошибкой'
+            : '',
+        )
+        setThought('')
+        setIsLoading(false)
+      } catch (loadError) {
+        if (cancelled) return
+        setStatus('error')
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Не удалось загрузить анализ резюме',
+        )
+        setIsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      abortRef.current?.abort()
+    }
+  }, [initialCheckId])
 
   function chooseAtsCheck() {
     setMode('ats_check')
@@ -172,6 +224,7 @@ export function useResumeSession() {
     setProgress(0)
     setPhase('check_resume')
     setStatus('thinking')
+    setIsLoading(false)
 
     await runStream(
       startResumeCheckStream({
@@ -233,6 +286,7 @@ export function useResumeSession() {
     setThought('')
     setProgress(0)
     setCheckId(null)
+    setIsLoading(false)
   }
 
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -246,6 +300,7 @@ export function useResumeSession() {
     thought,
     progress,
     checkId,
+    isLoading,
     chooseAtsCheck,
     chooseImproveExperience,
     chooseKeywords,

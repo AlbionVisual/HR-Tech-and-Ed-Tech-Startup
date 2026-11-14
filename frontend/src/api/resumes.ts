@@ -47,6 +47,36 @@ export type ResumeExtractResponse = {
   truncated: boolean
 }
 
+export type ResumeMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  thought: string
+  is_feedback: boolean
+  status: 'complete' | 'partial' | 'error'
+  seq: number
+  created_at: string
+}
+
+export type ResumeCheckSummary = {
+  id: string
+  mode: ResumeMode
+  title: string
+  status: ResumeCheckStatus
+  progress: number
+  source_type: ResumeSourceType
+  source_filename: string | null
+  messages_count: number
+  created_at: string
+  updated_at: string
+}
+
+export type ResumeCheckDetail = ResumeCheckSummary & {
+  source_text: string
+  source_chars: number
+  messages: ResumeMessage[]
+}
+
 async function readError(response: Response): Promise<string> {
   const text = await response.text().catch(() => '')
   try {
@@ -163,4 +193,25 @@ export function sendResumeMessageStream(input: {
     { content: input.content },
     input.signal,
   )
+}
+
+export async function listResumeChecks(): Promise<ResumeCheckSummary[]> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks`)
+  if (!response.ok) throw new Error(await readError(response))
+  return (await response.json()) as ResumeCheckSummary[]
+}
+
+export async function getResumeCheck(
+  checkId: string,
+): Promise<ResumeCheckDetail> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks/${checkId}`)
+  if (!response.ok) throw new Error(await readError(response))
+  return (await response.json()) as ResumeCheckDetail
+}
+
+export async function deleteResumeCheck(checkId: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/resumes/checks/${checkId}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) throw new Error(await readError(response))
 }

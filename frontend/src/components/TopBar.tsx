@@ -1,21 +1,30 @@
 import { SideMenu } from './SideMenu'
+import type { PageId } from '../config'
 
 type Props = {
 	title: string
+	page: PageId
 	isSideMenuOpen: boolean
 	onToggleSideMenu: () => void
 	activeChatId?: string | null
+	activeResumeCheckId?: string | null
 	onChatSelect: (id: string) => void
 	onNewChat: () => void
+	onResumeSelect: (id: string) => void
+	onNewResume: () => void
 }
 
 export function TopBar({
 	title,
+	page,
 	isSideMenuOpen,
 	onToggleSideMenu,
 	activeChatId,
+	activeResumeCheckId,
 	onChatSelect,
 	onNewChat,
+	onResumeSelect,
+	onNewResume,
 }: Props) {
 	return (
 		<header className="flex items-center justify-between gap-2.5 border-b border-line bg-bg-elevated py-0 pr-3 pl-4">
@@ -37,9 +46,13 @@ export function TopBar({
 				<SideMenu
 					isOpen={isSideMenuOpen}
 					onClose={onToggleSideMenu}
+					page={page}
 					activeChatId={activeChatId}
+					activeResumeCheckId={activeResumeCheckId}
 					onChatSelect={onChatSelect}
 					onNewChat={onNewChat}
+					onResumeSelect={onResumeSelect}
+					onNewResume={onNewResume}
 				/>
 			</div>
 		</header>
