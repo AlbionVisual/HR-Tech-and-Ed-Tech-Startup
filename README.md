@@ -36,6 +36,24 @@ Caddy выпускает локальный сертификат — прими�
 Наружу открываются только 80/443. PostgreSQL и API доступны только внутри
 Docker-сети.
 
+## Публичный адрес (домен или IP)
+
+Переключается одним скриптом:
+
+```bash
+python3 scripts/set_public_url.py https://127.0.0.1
+python3 scripts/set_public_url.py https://app.example.com
+```
+
+Скрипт правит `.env` (`APP_DOMAIN`, `APP_PUBLIC_URL`, `TELEGRAM_REDIRECT_URI`,
+`CADDY_TLS_LINE`) и печатает, что добавить в BotFather (Login Widget →
+Allowed URLs) и как перезапустить контейнеры.
+
+Для локального IP/`localhost` ставится `CADDY_TLS_LINE=tls internal` — Caddy
+выпускает локальный сертификат и отвечает на IP без SNI. Для настоящего домена
+строка пустая: Caddy сам получает сертификат Let's Encrypt. На сервере
+направьте DNS на IP и откройте наружу только 80/443.
+
 ## Production на VPS 1 GB / 1 CPU
 
 Стек рассчитан на один Uvicorn worker, пул БД из 5 соединений, один

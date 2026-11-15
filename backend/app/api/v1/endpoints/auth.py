@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -13,6 +14,7 @@ from app.modules.auth.service import AuthService
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/google", response_model=UserOut)
@@ -46,6 +48,7 @@ async def telegram_callback(
 ) -> RedirectResponse:
     state_cookie = request.cookies.get(TELEGRAM_STATE_COOKIE)
     if not state_cookie:
+        logger.warning("Telegram callback without state cookie")
         return _login_redirect("telegram_state_missing")
     try:
         user, token = await service.login_telegram(
@@ -54,7 +57,8 @@ async def telegram_callback(
             state_cookie,
             request,
         )
-    except AuthError:
+    except AuthError as exc:
+        logger.warning("Telegram login failed: %s", exc)
         return _login_redirect("telegram_failed")
 
     response = RedirectResponse(settings.app_public_url)

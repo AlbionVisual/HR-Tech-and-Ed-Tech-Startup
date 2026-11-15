@@ -1,4 +1,9 @@
+{
+	default_sni {$APP_DOMAIN:localhost}
+}
+
 {$APP_DOMAIN:localhost} {
+	{$CADDY_TLS_LINE}
 	encode zstd gzip
 
 	request_body {
