@@ -20,6 +20,7 @@ MVP-тренажёр для подготовки к собеседованиям
 ├── .github/workflows/     # CI, сборка образов, deploy
 ├── docker-compose.yml     # db + api + frontend + caddy
 ├── Caddyfile              # HTTPS и reverse proxy
+├── scripts/               # служебные скрипты
 └── .env.example
 ```
 
@@ -38,21 +39,32 @@ Docker-сети.
 
 ## Публичный адрес (домен или IP)
 
-Переключается одним скриптом:
+`scripts/set_public_url.py` — единственное место, где переключается адрес.
 
 ```bash
-python3 scripts/set_public_url.py https://127.0.0.1
+python3 scripts/set_public_url.py https://127.0.0.1     # локально, по IP
+python3 scripts/set_public_url.py https://localhost     # локально, по имени
 python3 scripts/set_public_url.py https://app.example.com
 ```
 
-Скрипт правит `.env` (`APP_DOMAIN`, `APP_PUBLIC_URL`, `TELEGRAM_REDIRECT_URI`,
-`CADDY_TLS_LINE`) и печатает, что добавить в BotFather (Login Widget →
-Allowed URLs) и как перезапустить контейнеры.
+Скрипт обновляет `.env` (`APP_DOMAIN`, `APP_PUBLIC_URL`,
+`TELEGRAM_REDIRECT_URI`, `CADDY_TLS_LINE`) и печатает, какие URL добавить
+в BotFather (Login Widget → Allowed URLs) и как перезапустить контейнеры.
+Принимает только `https` без пути и только порт 443 (другие наружу не
+опубликованы). Секреты и `AI_CORS_ORIGINS` не трогает.
 
-Для локального IP/`localhost` ставится `CADDY_TLS_LINE=tls internal` — Caddy
-выпускает локальный сертификат и отвечает на IP без SNI. Для настоящего домена
-строка пустая: Caddy сам получает сертификат Let's Encrypt. На сервере
-направьте DNS на IP и откройте наружу только 80/443.
+Подключение нового домена по шагам:
+
+1. Направить A/AAAA домена на IP сервера и открыть наружу 80/443.
+2. `python3 scripts/set_public_url.py https://app.example.com`
+3. В BotFather добавить напечатанные URL (тестовый `127.0.0.1` можно удалить).
+4. `docker compose up -d`
+5. Проверить: `curl https://app.example.com/health`
+
+Для локального IP скрипт ставит `CADDY_TLS_LINE=tls internal` — Caddy выпускает
+локальный сертификат и отвечает без SNI (браузер покажет предупреждение,
+примите его). Для публичного домена строка пустая: Caddy сам получает
+сертификат Let's Encrypt.
 
 ## Production на VPS 1 GB / 1 CPU
 
