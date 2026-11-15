@@ -1,6 +1,9 @@
+import asyncio
+import contextlib
 from typing import AsyncIterator, Literal, cast
 from uuid import UUID
 
+from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from app.modules.resumes.ai import ResumeAi
@@ -18,6 +21,7 @@ from app.modules.resumes.schemas import (
 )
 from app.modules.resumes.streaming import ResumeStreamer
 from app.modules.resumes.validators import (
+    MAX_FILE_SIZE,
     ResumeValidationError,
     detect_source_type,
     limit_text,
@@ -34,11 +38,38 @@ class ResumeNotFoundError(Exception):
 
 
 class ResumeService:
-    def __init__(self, repository: InMemoryResumeRepository, ai: ResumeAi) -> None:
+    def __init__(
+        self,
+        repository: InMemoryResumeRepository,
+        ai: ResumeAi,
+        parse_semaphore: asyncio.Semaphore | None = None,
+    ) -> None:
         self.repository = repository
         self.streamer = ResumeStreamer(repository, ai)
+        self._parse_semaphore = parse_semaphore
+
+    def _parse_slot(self):
+        if self._parse_semaphore is None:
+            return contextlib.nullcontext()
+        return self._parse_semaphore
+
+    async def extract_upload(
+        self,
+        filename: str | None,
+        content_type: str | None,
+        file: UploadFile,
+    ) -> ResumeExtractResponse:
+        async with self._parse_slot():
+            data = await file.read(MAX_FILE_SIZE + 1)
+            return await self._extract(filename, content_type, data)
 
     async def extract(
+        self, filename: str | None, content_type: str | None, data: bytes
+    ) -> ResumeExtractResponse:
+        async with self._parse_slot():
+            return await self._extract(filename, content_type, data)
+
+    async def _extract(
         self, filename: str | None, content_type: str | None, data: bytes
     ) -> ResumeExtractResponse:
         validate_file_size(data)

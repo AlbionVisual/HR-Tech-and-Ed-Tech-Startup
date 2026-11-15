@@ -8,20 +8,22 @@ MVP-тренажёр для подготовки к собеседованиям
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS.
 - **Backend:** Python 3.12+, FastAPI, SQLAlchemy, Alembic, uv.
 - **БД:** PostgreSQL 16.
-- **Инфраструктура:** Docker Compose, Caddy.
+- **Инфраструктура:** Docker Compose, Caddy, GitHub Actions, GHCR.
 
 ## Структура
 
 ```text
 .
-├── frontend/          # React SPA
-├── backend/           # FastAPI, БД, AI, тесты
-├── docker-compose.yml # db + api + frontend + caddy
-├── Caddyfile          # HTTPS и reverse proxy
+├── frontend/              # React SPA
+├── backend/               # FastAPI, БД, AI, тесты
+├── deploy/                # VPS setup и backup-скрипты
+├── .github/workflows/     # CI, сборка образов, deploy
+├── docker-compose.yml     # db + api + frontend + caddy
+├── Caddyfile              # HTTPS и reverse proxy
 └── .env.example
 ```
 
-## Запуск через Docker
+## Локальный запуск через Docker
 
 ```bash
 cp .env.example .env
@@ -31,13 +33,53 @@ docker compose up --build -d
 Приложение: https://localhost
 
 Caddy выпускает локальный сертификат — примите предупреждение браузера.
-Для VPS укажите в `.env` домен:
+Наружу открываются только 80/443. PostgreSQL и API доступны только внутри
+Docker-сети.
+
+## Production на VPS 1 GB / 1 CPU
+
+Стек рассчитан на один Uvicorn worker, пул БД из 5 соединений, один
+одновременный PDF/DOCX-парсинг и rate limit AI-запросов. Образы собираются
+в GitHub Actions и скачиваются с GHCR, поэтому VPS не тратит память на
+`npm build` и `uv sync`.
+
+Кратко:
+
+```bash
+sudo apt-get update && sudo apt-get install -y git
+git clone <repo> /opt/hrtech
+cd /opt/hrtech
+sudo bash deploy/vps-setup.sh
+cp .env.example .env
+nano .env
+docker compose pull
+docker compose up -d
+curl -fsS https://<APP_DOMAIN>/ready
+```
+
+Подробный runbook, переменные GitHub Actions, обновление, rollback и бэкапы:
+см. [deploy/README.md](deploy/README.md).
+
+Главное для `.env` на сервере:
 
 ```env
 APP_DOMAIN=app.example.com
+APP_PUBLIC_URL=https://app.example.com
+AI_CORS_ORIGINS=https://app.example.com
+TELEGRAM_REDIRECT_URI=https://app.example.com/api/v1/auth/telegram/callback
+POSTGRES_PASSWORD=<сильный URL-safe пароль>
+SESSION_SECRET=<openssl rand -hex 32>
 ```
 
-и направьте DNS на сервер. Наружу открываются только 80/443.
+## GitHub Actions
+
+- `CI` — backend-тесты, frontend lint/build, сборка и push образов в GHCR
+  при push в `main`.
+- `Deploy` — pull готовых образов на VPS, `docker compose up -d`,
+  проверка `/ready`, автоматический rollback на предыдущий тег.
+
+Автодеплой включается переменной репозитория `DEPLOY_ENABLED=true`.
+Список secrets и variables — в [deploy/README.md](deploy/README.md).
 
 ## Запуск без Docker
 
@@ -75,7 +117,11 @@ npm run dev
 - `/api/v1/tests/*` — тесты и попытки.
 - `/api/v1/profile/*` — профиль.
 
-Swagger: https://localhost/docs
+Проверки:
+
+- `/health` — liveness.
+- `/ready` — API и подключение к БД.
+- `/docs` — Swagger.
 
 ## Проверки
 
@@ -86,7 +132,26 @@ uv run pytest -q
 cd frontend
 npm run lint
 npm run build
+
+docker compose config --quiet
 ```
+
+## Ограничения под 1 GB
+
+| Параметр | Значение по умолчанию |
+| --- | --- |
+| Uvicorn workers | 1 |
+| `--limit-concurrency` | 20 |
+| `DATABASE_POOL_SIZE` | 5 |
+| `DATABASE_MAX_OVERFLOW` | 2 |
+| PostgreSQL `shared_buffers` | 128 MB |
+| PostgreSQL `max_connections` | 20 |
+| `AI_RATE_LIMIT_REQUESTS` | 30 за 60 с на пользователя |
+| `RESUME_PARSE_CONCURRENCY` | 1 |
+| Лимит тела запроса (Caddy) | 16 MB |
+
+Rate limit хранится в памяти процесса. Это корректно только при одном
+Uvicorn worker; при масштабировании нужен Redis.
 
 ## Текущий статус
 

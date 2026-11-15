@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import StreamingResponse
 
-from app.api.v1.deps import get_interview_service
+from app.api.v1.deps import ai_rate_limit, get_interview_service
 from app.api.v1.sse import sse_response
 from app.modules.auth.deps import get_current_user_id
 from app.core.sse import sse
@@ -51,6 +51,7 @@ def _stream(
 async def start_interview(
     payload: InterviewSessionCreate,
     user_id: UUID = Depends(get_current_user_id),
+    _rate_limit: None = Depends(ai_rate_limit),
     service: InterviewService = Depends(get_interview_service),
 ) -> StreamingResponse:
     session = await service.create_session(user_id, payload)
@@ -62,6 +63,7 @@ async def continue_interview(
     session_id: UUID,
     payload: InterviewMessageCreate,
     user_id: UUID = Depends(get_current_user_id),
+    _rate_limit: None = Depends(ai_rate_limit),
     service: InterviewService = Depends(get_interview_service),
 ) -> StreamingResponse:
     session, message = await service.begin_follow_up(user_id, session_id, payload)
@@ -72,6 +74,7 @@ async def continue_interview(
 async def next_question(
     session_id: UUID,
     user_id: UUID = Depends(get_current_user_id),
+    _rate_limit: None = Depends(ai_rate_limit),
     service: InterviewService = Depends(get_interview_service),
 ) -> StreamingResponse:
     session = await service.begin_next_question(user_id, session_id)

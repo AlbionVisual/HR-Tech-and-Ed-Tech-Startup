@@ -1,3 +1,4 @@
+import asyncio
 import os
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from app.core.config import Settings, settings
 from app.core.db.connection import database
 from app.core.db.models import Base, User
 from app.core.db.schema import ensure_schema
+from app.core.limits import RateLimiter
 from app.main import app
 from app.modules.auth.deps import get_current_user, get_current_user_id
 from app.modules.auth.repository import AuthRepository
@@ -70,6 +72,8 @@ async def _current_test_user() -> User:
 @pytest.fixture
 async def client(db):
     app.state.http = httpx.AsyncClient()
+    app.state.ai_rate_limiter = RateLimiter(30, 60)
+    app.state.resume_parse_semaphore = asyncio.Semaphore(1)
     app.dependency_overrides[get_current_user] = _current_test_user
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
     transport = ASGITransport(app=app)
@@ -82,3 +86,6 @@ async def client(db):
     finally:
         app.dependency_overrides.clear()
         await app.state.http.aclose()
+        for name in ("ai_rate_limiter", "resume_parse_semaphore"):
+            if hasattr(app.state, name):
+                delattr(app.state, name)

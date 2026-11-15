@@ -1,0 +1,161 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag: latest or sha-<commit>. Empty = current main SHA."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      vars.DEPLOY_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    steps:
+      - name: Resolve image tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.image_tag }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          FALLBACK_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG:-${RUN_SHA:-${FALLBACK_SHA}}}"
+          if [[ "$TAG" != "latest" && "$TAG" != sha-* ]]; then
+            TAG="sha-${TAG}"
+          fi
+          if ! [[ "$TAG" =~ ^(sha-[0-9a-f]{7,40}|latest)$ ]]; then
+            echo "Invalid image tag: $TAG" >&2
+            exit 1
+          fi
+          echo "value=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/hrtech' }}
+          IMAGE_TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          set -euo pipefail
+          : "${VPS_HOST:?VPS_HOST secret is required}"
+          : "${VPS_USER:?VPS_USER secret is required}"
+          : "${VPS_SSH_KEY:?VPS_SSH_KEY secret is required}"
+
+          umask 077
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+
+          if [ -n "${VPS_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts"
+          fi
+
+          ssh \
+            -i "$HOME/.ssh/id_ed25519" \
+            -p "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' IMAGE_TAG='$IMAGE_TAG' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/hrtech}"
+          cd "$DEPLOY_PATH"
+
+          if [ ! -f .env ]; then
+            echo "Missing $DEPLOY_PATH/.env" >&2
+            exit 1
+          fi
+
+          if [ -d .git ]; then
+            echo "Syncing repository with origin/main"
+            git config --global --add safe.directory "$DEPLOY_PATH" 2>/dev/null || true
+            git fetch --prune origin main
+            if [[ "$IMAGE_TAG" == sha-* ]]; then
+              git reset --hard "${IMAGE_TAG#sha-}"
+            else
+              git reset --hard origin/main
+            fi
+          fi
+
+          docker compose config --quiet
+
+          old_tag="$(grep -E '^IMAGE_TAG=' .env | tail -n 1 | cut -d= -f2- || true)"
+          old_tag="${old_tag:-latest}"
+          old_api_id="$(docker compose images -q api 2>/dev/null || true)"
+
+          set_tag() {
+            if grep -qE '^IMAGE_TAG=' .env; then
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$1|" .env
+            else
+              printf '\nIMAGE_TAG=%s\n' "$1" >> .env
+            fi
+          }
+
+          wait_ready() {
+            for _ in $(seq 1 30); do
+              if docker compose exec -T api python -c \
+                "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)" \
+                >/dev/null 2>&1 \
+                && docker compose exec -T frontend wget -q -O /dev/null http://127.0.0.1/ \
+                && docker compose ps --status running --services | grep -qx caddy; then
+                return 0
+              fi
+              sleep 3
+            done
+            return 1
+          }
+
+          echo "Deploying $IMAGE_TAG (previous: $old_tag)"
+          set_tag "$IMAGE_TAG"
+
+          if ! docker compose pull api frontend \
+            || ! docker compose up -d --remove-orphans \
+            || ! wait_ready; then
+            echo "Deploy failed, rolling back to $old_tag" >&2
+            docker compose logs --tail=100 api || true
+
+            rollback_tag="$old_tag"
+            if [ "$old_tag" = "latest" ] && [ -n "$old_api_id" ]; then
+              old_revision="$(docker inspect --format \
+                '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+                "$old_api_id" 2>/dev/null || true)"
+              if [ -n "$old_revision" ]; then
+                rollback_tag="sha-$old_revision"
+              fi
+            fi
+
+            echo "Rollback tag: $rollback_tag" >&2
+            set_tag "$rollback_tag"
+            docker compose pull api frontend || true
+            docker compose up -d --remove-orphans || true
+            wait_ready || echo "Rollback health check failed" >&2
+            exit 1
+          fi
+
+          docker compose ps
+          docker image prune -f >/dev/null || true
+          echo "Deploy complete: $IMAGE_TAG"
+          REMOTE

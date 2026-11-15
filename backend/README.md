@@ -31,8 +31,21 @@ uv run uvicorn app.main:app --reload --port 8000
 Проверка:
 
 - http://localhost:8000/docs
-- http://localhost:8000/health
+- http://localhost:8000/health — liveness
+- http://localhost:8000/ready — API и БД
 - http://localhost:8000/api/v1/ai/models
+
+
+### Ограничения
+
+- `AI_RATE_LIMIT_REQUESTS` / `AI_RATE_LIMIT_WINDOW_SECONDS` — лимит
+  AI-запросов на пользователя (по умолчанию 30 за 60 секунд).
+- `RESUME_PARSE_CONCURRENCY` — сколько PDF/DOCX парсить одновременно
+  (по умолчанию 1).
+- `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` — пул PostgreSQL
+  (по умолчанию 5 + 2).
+
+Rate limit хранится в памяти процесса и рассчитан на один Uvicorn worker.
 
 
 ### AI
@@ -101,7 +114,7 @@ backend/
 │   ├── api/v1/                  # роутеры, deps, SSE, ошибки
 │   ├── core/
 │   │   ├── config.py            # настройки из .env
-│   │   ├── deps.py              # временный demo user
+│   │   ├── limits.py            # rate limit и лимиты
 │   │   └── ai/                  # провайдеры, промпты, SSE
 │   └── modules/                 # домены: резюме, интервью, тесты
 │       ├── resumes/             # парсеры, repository, service

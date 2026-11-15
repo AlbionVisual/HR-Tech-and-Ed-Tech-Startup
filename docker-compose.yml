@@ -1,10 +1,37 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
+    container_name: hrtech_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-hrtech}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=20
+      - -c
+      - max_parallel_workers_per_gather=0
+      - -c
+      - autovacuum_max_workers=1
+      - -c
+      - jit=off
+    shm_size: "128mb"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -12,17 +39,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+    logging: *default-logging
+    stop_grace_period: 60s
     restart: unless-stopped
 
   api:
+    image: ${BACKEND_IMAGE:-ghcr.io/albionvisual/hr-tech-and-ed-tech-startup/backend}:${IMAGE_TAG:-latest}
     build:
       context: ./backend
+    init: true
     environment:
       APP_NAME: ${APP_NAME:-HR/Ed Tech API}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       API_V1_PREFIX: /api/v1
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hrtech}
-      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-2}
       DATABASE_ECHO: ${DATABASE_ECHO:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
@@ -32,6 +65,9 @@ services:
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
       AI_MAX_MESSAGES: ${AI_MAX_MESSAGES:-100}
       AI_MAX_MESSAGE_CHARS: ${AI_MAX_MESSAGE_CHARS:-50000}
+      AI_RATE_LIMIT_REQUESTS: ${AI_RATE_LIMIT_REQUESTS:-30}
+      AI_RATE_LIMIT_WINDOW_SECONDS: ${AI_RATE_LIMIT_WINDOW_SECONDS:-60}
+      RESUME_PARSE_CONCURRENCY: ${RESUME_PARSE_CONCURRENCY:-1}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       TELEGRAM_CLIENT_ID: ${TELEGRAM_CLIENT_ID:-}
       TELEGRAM_CLIENT_SECRET: ${TELEGRAM_CLIENT_SECRET:-}
@@ -48,13 +84,17 @@ services:
     expose:
       - "8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
-      interval: 10s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)"]
+      interval: 15s
       timeout: 5s
-      retries: 10
+      retries: 5
+      start_period: 60s
+    logging: *default-logging
+    stop_grace_period: 30s
     restart: unless-stopped
 
   frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/albionvisual/hr-tech-and-ed-tech-startup/frontend}:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       args:
@@ -65,10 +105,16 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
     restart: unless-stopped
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.10-alpine
     ports:
       - "80:80"
       - "443:443"
@@ -81,6 +127,7 @@ services:
     depends_on:
       - frontend
       - api
+    logging: *default-logging
     restart: unless-stopped
 
 volumes:

@@ -28,6 +28,7 @@ class Database:
         }
         if not url.startswith("sqlite"):
             kwargs["pool_size"] = self._settings.database_pool_size
+            kwargs["max_overflow"] = self._settings.database_max_overflow
 
         self._engine = create_async_engine(url, **kwargs)
         self._session_factory = async_sessionmaker(

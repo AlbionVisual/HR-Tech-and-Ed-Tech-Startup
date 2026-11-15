@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
-from app.api.v1.deps import get_resume_service
+from app.api.v1.deps import ai_rate_limit, get_resume_service
 from app.api.v1.sse import sse_response
 from app.modules.auth.deps import get_current_user_id
 from app.core.sse import sse
@@ -17,7 +17,6 @@ from app.modules.resumes.schemas import (
     ResumeMessageCreate,
 )
 from app.modules.resumes.service import ResumeService
-from app.modules.resumes.validators import MAX_FILE_SIZE
 
 
 router = APIRouter()
@@ -48,14 +47,14 @@ async def extract_resume(
     user_id: UUID = Depends(get_current_user_id),
     service: ResumeService = Depends(get_resume_service),
 ) -> ResumeExtractResponse:
-    data = await file.read(MAX_FILE_SIZE + 1)
-    return await service.extract(file.filename, file.content_type, data)
+    return await service.extract_upload(file.filename, file.content_type, file)
 
 
 @router.post("/checks:stream")
 async def start_check(
     payload: ResumeCheckCreate,
     user_id: UUID = Depends(get_current_user_id),
+    _rate_limit: None = Depends(ai_rate_limit),
     service: ResumeService = Depends(get_resume_service),
 ) -> StreamingResponse:
     check, message = await service.create_check(user_id, payload)
@@ -67,6 +66,7 @@ async def continue_check(
     check_id: UUID,
     payload: ResumeMessageCreate,
     user_id: UUID = Depends(get_current_user_id),
+    _rate_limit: None = Depends(ai_rate_limit),
     service: ResumeService = Depends(get_resume_service),
 ) -> StreamingResponse:
     check, message = await service.begin_follow_up(user_id, check_id, payload)

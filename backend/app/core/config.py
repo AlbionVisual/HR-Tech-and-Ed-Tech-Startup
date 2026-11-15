@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = 120.0
     ai_max_messages: int = 100
     ai_max_message_chars: int = 50_000
+    ai_rate_limit_requests: int = 30
+    ai_rate_limit_window_seconds: float = 60.0
 
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
@@ -29,8 +31,11 @@ class Settings(BaseSettings):
     openrouter_app_name: str = "Interview MVP"
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/hrtech"
-    database_pool_size: int = 10
+    database_pool_size: int = 5
+    database_max_overflow: int = 2
     database_echo: bool = False
+
+    resume_parse_concurrency: int = 1
 
     google_client_id: str = ""
     telegram_client_id: str = ""
